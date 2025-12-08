@@ -24,8 +24,10 @@ app.get('/', (req, res) => {
 // --------------------
 
 // Chạy server
-app.listen(PORT, () => {
-    console.log(`Server đang chạy tại http://localhost:${PORT}`);
-});
+if (require.main === module) {
+    app.listen(PORT, () => {
+        console.log(`Server đang chạy tại http://localhost:${PORT}`);
+    });
+}
 
 module.exports = app;
