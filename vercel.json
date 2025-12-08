@@ -8,7 +8,20 @@
     ],
     "routes": [
         {
-            "handle": "filesystem"
+            "src": "/css/(.*)",
+            "dest": "/public/css/$1"
+        },
+        {
+            "src": "/js/(.*)",
+            "dest": "/public/js/$1"
+        },
+        {
+            "src": "/img/(.*)",
+            "dest": "/public/img/$1"
+        },
+        {
+            "src": "/Game/(.*)",
+            "dest": "/public/Game/$1"
         },
         {
             "src": "/(.*)",
