@@ -1,29 +1,354 @@
 <!DOCTYPE html>
 <html lang="vi">
-
-<head>
+<head>  
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>
-        <%= pageTitle %>
-    </title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="/css/style.css">
+    <title>Pickleball Champions</title>     
+    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .spacing {
+            height: 50px;
+            width: 100%;
+            background: transparent;
+        }
+        .big-spacing {
+            height: 80px;
+            width: 100%;
+            background: transparent;
+        }
+    </style>
 </head>
-
 <body>
-    <div class="container mt-5">
-        <div class="card text-center">
-            <div class="card-header">
-                Demo MVC Architecture
+    <header class="header">
+        <div class="title">
+            <h1>Pickleball Champions</h1>
+            <ul>
+                <li><a href="#introduction">Introduce</a></li>
+                <li><a href="#instructions">Instruct</a></li>
+                <li><a href="#updatesSection">Update</a></li>
+            </ul>
+        </div>
+        
+        <!-- Thay thế phần sign_in bằng hệ thống auth -->
+        <div class="auth-section" id="authSection">
+            <!-- Chưa đăng nhập -->
+            <div class="auth-buttons" id="authButtons">
+                <button class="sign-in-button" onclick="showAuthModal('login')">Log in</button>
+                <button class="sign-up-button" onclick="showAuthModal('signup')">Sign up</button>
             </div>
-            <div class="card-body">
-                <h5 class="card-title">Xin chào, <%= userName %>!</h5>
-                <p class="card-text">Đây là giao diện được render từ EJS và Express.</p>
-                <a href="#" class="btn btn-primary">Nút bấm Bootstrap</a>
+            
+            <!-- Đã đăng nhập -->
+            <div class="user-profile" id="userProfile" style="display: none;">
+                <div class="profile-info">
+                    <span class="user-avatar" id="userAvatar">👤</span>
+                    <span class="username" id="usernameDisplay"></span>
+                </div>
+                <button class="logout-button" onclick="logout()">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
+        </div>
+    </header>
+
+<!-- Thêm vào index.html sau phần header hoặc trong user-profile -->
+<!-- Thay thế admin toggle button cũ -->
+<div class="admin-panel" id="adminPanel" style="display: none;">
+    <button class="admin-toggle-btn" onclick="toggleAdminPanel()">
+        <i class="fas fa-cogs"></i> Admin Panel
+    </button>
+    <!-- ... phần modal giữ nguyên ... -->
+     <!-- Cập nhật phần admin tabs trong index.html -->
+<div class="admin-modal" id="adminModal" style="display: none;">
+    <div class="admin-modal-content">
+        <span class="close-admin-modal" onclick="closeAdminModal()">&times;</span>
+        <h2><i class="fas fa-cogs"></i> Admin Control Panel</h2>
+        
+        <!-- Stats Cards -->
+        <div class="admin-stats">
+            <div class="stat-card">
+                <div class="stat-number" id="totalUsers">0</div>
+                <div class="stat-label">Total Users</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="totalComments">0</div>
+                <div class="stat-label">Total Comments</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="bannedUsers">0</div>
+                <div class="stat-label">Banned Users</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-number" id="totalUpdates">0</div>
+                <div class="stat-label">Updates</div>
+            </div>
+        </div>
+        
+        <!-- Tab Navigation -->
+        <div class="admin-tabs">
+            <button class="admin-tab active" onclick="openAdminTab('users')">
+                <i class="fas fa-users"></i> Users
+            </button>
+            <button class="admin-tab" onclick="openAdminTab('comments')">
+                <i class="fas fa-comments"></i> Comments
+            </button>
+            <button class="admin-tab" onclick="openAdminTab('updates')">
+                <i class="fas fa-bullhorn"></i> Updates
+            </button>
+        </div>
+        
+        <!-- Users Management Tab -->
+        <div id="usersTab" class="admin-tab-content active">
+            <div class="search-container">
+                <input type="text" id="searchUser" placeholder="🔍 Search users by name..." 
+                       onkeyup="searchUsers()" class="search-input">
+            </div>
+            <div class="users-list" id="usersList">
+                <!-- Users will be loaded here -->
+            </div>
+        </div>
+        
+        <!-- Comments Management Tab -->
+        <div id="commentsTab" class="admin-tab-content">
+            <div class="search-container">
+                <input type="text" id="searchComment" placeholder="🔍 Search comments by content or author..." 
+                       onkeyup="searchComments()" class="search-input">
+            </div>
+            <div class="admin-comments-list" id="adminCommentsList">
+                <!-- All comments will be loaded here -->
+            </div>
+        </div>
+        
+          <!-- Updates Management Tab -->
+           <!-- Trong phần admin modal, sửa nút Add New Update -->
+            <div id="updatesTab" class="admin-tab-content">
+            <!-- Sửa nút Add New Update -->
+            <button class="add-update-btn" onclick="showAddUpdateForm()">
+                <i class="fas fa-plus"></i> Add New Update
+            </button>
+                  <div class="updates-list" id="updatesList">
+                <!-- Updates will be loaded here -->
             </div>
         </div>
     </div>
-</body>
+</div>
+</div>
+    <!-- Modal đăng nhập/đăng ký -->
+    <!-- Chỉ cần sửa phần modal trong index.html -->
+<div class="auth-modal" id="authModal" style="display: none;">
+    <div class="modal-content">
+        <span class="close-modal" onclick="closeAuthModal()">&times;</span>
+        <h2 id="modalTitle">Log in</h2>
+        <div class="auth-form">
+            <input type="text" id="authUsername" placeholder="Username" maxlength="20" autocomplete="username">
+            <input type="password" id="authPassword" placeholder="Password" maxlength="30" autocomplete="current-password">
+            <button id="authSubmitBtn" onclick="handleAuthSubmit()">Log in</button>
+            <p class="auth-switch" id="authSwitch">
+                Don't have an account? <a href="#" onclick="toggleAuthMode()">Sign up</a>
+            </p>
+            <p class="auth-error" id="authError"></p>
+        </div>
+    </div>
+</div>
 
+    <!-- KHOẢNG CÁCH SAU HEADER -->
+    <div class="big-spacing"></div>
+
+    <!-- GAME PLAYER -->
+    <div class="game-player" id="gamePlayer">
+        <div class="game-placeholder" id="gamePlaceholder">
+            <div class="placeholder-content">
+                <button class="run-game-btn" onclick="startGame()">
+                    ▶ RUN GAME
+                </button>
+                <p>Click RUN GAME to start playing</p>
+            </div>
+        </div>
+        <button class="fullscreen-btn" onclick="toggleFullscreen()" id="fullscreenButton">
+            ⛶
+        </button>
+    </div>
+
+    <!-- KHOẢNG CÁCH SAU GAME -->
+    <div class="big-spacing"></div>
+
+    <!-- GIỚI THIỆU -->
+    <div id="introduction" style="max-width: 800px; margin: 0 auto; padding: 0 20px; color: white;">
+        <h2 style="text-align: center; margin-bottom: 30px; font-size: 2rem;">📝 Introduce</h2>
+        <div style="background: rgba(0, 0, 0, 0.3); padding: 2rem; border-radius: 10px; text-align: center;">
+            <h3 style="font-size: 1.2rem; line-height: 1.6; font-weight: normal;">
+                Welcome, new players, to Pickleball Champion!<br>
+                This is the ultimate challenge to see just how far your limits can go<br>
+                The arena is overflowing with brutal challenges<br> Enter, and prove the true power of your skills!<br>
+                Do you have what it takes to become a true champion?<br>
+                Champions by blood, step forward and prove yourselves!<br>
+                Come Here!!!!!!!
+            </h3>
+        </div>
+    </div>
+
+    <!-- KHOẢNG CÁCH SAU GIỚI THIỆU -->
+    <div class="big-spacing"></div>
+
+    <!-- HƯỚNG DẪN -->
+    <div id="instructions" style="max-width: 800px; margin: 0 auto; padding: 0 20px; color: white;">
+        <h2 style="text-align: center; margin-bottom: 30px; font-size: 2rem;">🎮 Game Controls</h2>
+        <div class="controls-grid">
+            <div class="control-section">
+                <h3 class="control-title">Movement Keys</h3>
+                <div class="keys-container">
+                    <div class="key-row">
+                        <div class="key-placeholder"></div>
+                        <div class="key key-w">W</div>
+                        <div class="key-placeholder"></div>
+                    </div>
+                    <div class="key-row">
+                        <div class="key key-a">A</div>
+                        <div class="key key-s">S</div>
+                        <div class="key key-d">D</div>
+                    </div>
+                </div>
+                <p class="key-description">Use <strong>W A S D</strong> to move your player</p>
+            </div>
+            
+            <div class="control-section">
+                <h3 class="control-title">Actions</h3>
+                <div class="spacebar-container">
+                    <div class="spacebar-key">
+                        <span class="spacebar-text">SPACE</span>
+                    </div>
+                </div>
+                <p class="key-description">Press <strong>SPACE</strong> to dash</p>
+                
+                <div class="mouse-container">
+                    <div class="mouse">
+                        <div class="mouse-left"></div>
+                        <div class="mouse-middle"></div>
+                        <div class="mouse-right"></div>
+                    </div>
+                </div>
+                <p class="key-description">Use <strong>mouse</strong> to aim the ball</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- KHOẢNG CÁCH SAU HƯỚNG DẪN -->
+    <div class="big-spacing"></div>
+
+    <!-- Thêm vào sau phần HƯỚNG DẪN và trước phần COMMENTS SECTION -->
+<!-- KHOẢNG CÁCH SAU HƯỚNG DẪN -->
+<div class="big-spacing"></div>
+
+<!-- UPDATES SECTION -->
+<div class="updates-section" id="updatesSection" style="display: none;">
+    <div class="updates-container">
+        <div class="updates-header">
+            <h2><i class="fas fa-bullhorn"></i> Updates <span class="updates-count" id="updatesCount">(0)</span></h2>
+            
+            <!-- Search and Filter -->
+            <div class="updates-controls">
+                <div class="search-updates">
+                    <input type="text" id="searchUpdates" placeholder="🔍 Search updates..." 
+                           onkeyup="filterUpdates()">
+                </div>
+                <div class="filter-updates">
+                    <select id="filterUpdates" onchange="filterUpdates()">
+                        <option value="all">All Updates</option>
+                        <option value="recent">Recent</option>
+                        <option value="oldest">Oldest</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+        
+        <!-- ============ UPDATE SLIDER ============ -->
+        <div id="updatesSlider" class="updates-slider" style="display: none;">
+            <div class="slider-header">
+                <h3>Updates <span id="updateCounter">1/5</span></h3>
+                <div class="slider-controls">
+                    <button id="prevUpdate" class="slider-btn" onclick="prevUpdate()">
+                        <i class="fas fa-chevron-left"></i>
+                    </button>
+                    <button id="nextUpdate" class="slider-btn" onclick="nextUpdate()">
+                        <i class="fas fa-chevron-right"></i>
+                    </button>
+                    <button id="showAllUpdates" class="show-all-btn" onclick="toggleShowAll()">
+                        <i class="fas fa-list"></i> Show All
+                    </button>
+                </div>
+            </div>
+            
+            <div id="updateSlides" class="update-slides">
+                <!-- Slides will be rendered here -->
+            </div>
+            
+            <div class="slider-navigation">
+                <div class="slider-dots" id="updateDots"></div>
+            </div>
+        </div>
+        <!-- ============ END SLIDER ============ -->
+        
+        <!-- No updates message -->
+        <div class="no-updates" id="noUpdates" style="display: none;">
+            <div class="no-updates-content">
+                <i class="fas fa-newspaper"></i>
+                <h3>No updates yet</h3>
+                <p>Check back later for new updates!</p>
+            </div>
+        </div>
+        
+        <!-- Not logged in message -->
+        <div class="login-to-view-updates" id="loginToViewUpdates" style="display: none;">
+            <div class="login-prompt">
+                <i class="fas fa-lock"></i>
+                <h3>Please log in to view updates</h3>
+                <p>You need to be logged in to see the latest updates from the admin.</p>
+                <button class="login-prompt-btn" onclick="showAuthModal('login')">
+                    <i class="fas fa-sign-in-alt"></i> Log in now
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- KHOẢNG CÁCH SAU UPDATES -->
+<div class="big-spacing"></div>
+
+    <!-- COMMENTS SECTION -->
+    <div class="comments-section">
+        <div class="comments-container">
+            <h2 class="comments-title">Comments <span class="comments-count" id="commentsCount">(0)</span></h2>
+            
+            <!-- Form comment (chỉ hiện khi đã login) -->
+            <div class="comment-form" id="commentForm">
+                <div class="login-to-comment" id="loginToComment">
+                    <p>
+                        <a href="#" onclick="showAuthModal('login')" style="color: #2196F3; text-decoration: underline;">
+                            Please login or sign up to comment
+                        </a>
+                    </p>
+                </div>
+                
+                <div class="comment-input-section" id="commentInputSection" style="display: none;">
+                    <textarea id="commentInput" class="comment-input" placeholder="Add a comment..."></textarea>
+                    <div class="comment-form-actions">
+                        <button class="cancel-btn" onclick="clearCommentInput()">Cancel</button>
+                        <button class="submit-btn" onclick="submitComment()">Comment</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Danh sách comments -->
+            <div class="comments-list" id="commentsList"></div>
+        </div>
+    </div>
+
+    <!-- KHOẢNG CÁCH DƯỚI CÙNG -->
+    <div class="spacing"></div>
+
+    <!-- Scripts -->
+<script src="userSystem.js"></script>
+<script src="customModals.js"></script> <!-- Load trước -->
+<script src="file.js"></script> <!-- Load sau để dùng hàm từ customModals -->
+</body>
 </html>
