@@ -37,6 +37,7 @@
                 <button class="sign-in-button" onclick="showAuthModal('login')">Log in</button>
                 <button class="sign-up-button" onclick="showAuthModal('signup')">Sign up</button>
             </div>
+
             
             <!-- Đã đăng nhập -->
             <div class="user-profile" id="userProfile" style="display: none;">
@@ -128,6 +129,12 @@
             </button>
                   <div class="updates-list" id="updatesList">
                 <!-- Updates will be loaded here -->
+
+            <div class="card-body">
+                <h5 class="card-title">Xin chào, <%= userName %>!</h5>
+                <p class="card-text">Đây là giao diện được render từ EJS và Express.</p>
+                <a href="/Game/Game.html" class="btn btn-primary">Nút bấm Chơi Game</a>
+
             </div>
         </div>
     </div>
