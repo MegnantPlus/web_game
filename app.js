@@ -3,7 +3,7 @@ const app = express();
 const path = require('path');
 // const webRoutes = require('./routes/web'); // Tạm thời comment dòng này nếu chưa cần thiết
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 
 // Cấu hình Template Engine là EJS
 app.set('view engine', 'ejs');
@@ -27,3 +27,5 @@ app.get('/', (req, res) => {
 app.listen(PORT, () => {
     console.log(`Server đang chạy tại http://localhost:${PORT}`);
 });
+
+module.exports = app;
