@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+=<!DOCTYPE html>
 <html lang="vi">
 
 <head>
@@ -20,6 +20,21 @@
             width: 100%;
             background: transparent;
         }
+        
+        /* Thêm style cho vote system mới */
+        .vote-number {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: white;
+        }
+        
+        .vote-up.active {
+            color: #4CAF50 !important;
+        }
+        
+        .vote-down.active {
+            color: #ff4757 !important;
+        }
     </style>
 </head>
 
@@ -29,20 +44,17 @@
             <h1>Pickleball Champions</h1>
             <ul>
                 <li><a href="#introduction">Introduce</a></li>
-                <li><a href="#instructions">Instruct</a></li>
-                <li><a href="#updatesSection">Update</a></li>
+                <li><a href="#donate">Donate</a></li>
+                <li><a href="#updatesSection">Updates</a></li>
             </ul>
         </div>
 
-        <!-- Thay thế phần sign_in bằng hệ thống auth -->
         <div class="auth-section" id="authSection">
-            <!-- Chưa đăng nhập -->
             <div class="auth-buttons" id="authButtons">
                 <button class="sign-in-button" onclick="showAuthModal('login')">Log in</button>
                 <button class="sign-up-button" onclick="showAuthModal('signup')">Sign up</button>
             </div>
 
-            <!-- Đã đăng nhập -->
             <div class="user-profile" id="userProfile" style="display: none;">
                 <div class="profile-info">
                     <span class="user-avatar" id="userAvatar">👤</span>
@@ -55,14 +67,12 @@
         </div>
     </header>
 
-    <!-- Thêm vào index.html sau phần header hoặc trong user-profile -->
-    <!-- Thay thế admin toggle button cũ -->
+    <!-- Admin Panel -->
     <div class="admin-panel" id="adminPanel" style="display: none;">
         <button class="admin-toggle-btn" onclick="toggleAdminPanel()">
             <i class="fas fa-cogs"></i> Admin Panel
         </button>
-        <!-- ... phần modal giữ nguyên ... -->
-        <!-- Cập nhật phần admin tabs trong index.html -->
+        
         <div class="admin-modal" id="adminModal" style="display: none;">
             <div class="admin-modal-content">
                 <span class="close-admin-modal" onclick="closeAdminModal()">&times;</span>
@@ -124,9 +134,7 @@
                 </div>
 
                 <!-- Updates Management Tab -->
-                <!-- Trong phần admin modal, sửa nút Add New Update -->
                 <div id="updatesTab" class="admin-tab-content">
-                    <!-- Sửa nút Add New Update -->
                     <button class="add-update-btn" onclick="showAddUpdateForm()">
                         <i class="fas fa-plus"></i> Add New Update
                     </button>
@@ -137,8 +145,8 @@
             </div>
         </div>
     </div>
-    <!-- Modal đăng nhập/đăng ký -->
-    <!-- Chỉ cần sửa phần modal trong index.html -->
+
+    <!-- Auth Modal -->
     <div class="auth-modal" id="authModal" style="display: none;">
         <div class="modal-content">
             <span class="close-modal" onclick="closeAuthModal()">&times;</span>
@@ -174,7 +182,6 @@
         </button>
     </div>
 
-    <!-- KHOẢNG CÁCH SAU GAME -->
     <div class="big-spacing"></div>
 
     <!-- GIỚI THIỆU -->
@@ -192,65 +199,36 @@
         </div>
     </div>
 
-    <!-- KHOẢNG CÁCH SAU GIỚI THIỆU -->
     <div class="big-spacing"></div>
 
-    <!-- HƯỚNG DẪN -->
-    <div id="instructions" style="max-width: 800px; margin: 0 auto; padding: 0 20px; color: white;">
-        <h2 style="text-align: center; margin-bottom: 30px; font-size: 2rem;">🎮 Game Controls</h2>
-        <div class="controls-grid">
-            <div class="control-section">
-                <h3 class="control-title">Movement Keys</h3>
-                <div class="keys-container">
-                    <div class="key-row">
-                        <div class="key-placeholder"></div>
-                        <div class="key key-w">W</div>
-                        <div class="key-placeholder"></div>
-                    </div>
-                    <div class="key-row">
-                        <div class="key key-a">A</div>
-                        <div class="key key-s">S</div>
-                        <div class="key key-d">D</div>
-                    </div>
-                </div>
-                <p class="key-description">Use <strong>W A S D</strong> to move your player</p>
-            </div>
-
-            <div class="control-section">
-                <h3 class="control-title">Actions</h3>
-                <div class="spacebar-container">
-                    <div class="spacebar-key">
-                        <span class="spacebar-text">SPACE</span>
-                    </div>
-                </div>
-                <p class="key-description">Press <strong>SPACE</strong> to dash</p>
-
-                <div class="mouse-container">
-                    <div class="mouse">
-                        <div class="mouse-left"></div>
-                        <div class="mouse-middle"></div>
-                        <div class="mouse-right"></div>
-                    </div>
-                </div>
-                <p class="key-description">Use <strong>mouse</strong> to aim the ball</p>
+    <!-- DONATE SECTION -->
+    <div id="donate" style="max-width: 800px; margin: 0 auto; padding: 0 20px; color: white;">
+        <h2 style="text-align: center; margin-bottom: 30px; font-size: 2rem;">❤️ Donate</h2>
+        <div style="background: rgba(0, 0, 0, 0.3); padding: 2rem; border-radius: 10px; text-align: center;">
+            <h3 style="font-size: 1.2rem; line-height: 1.6; font-weight: normal; margin-bottom: 20px;">
+                Support our game development! Your donations help us create more amazing content.
+            </h3>
+            <div style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;">
+                <button style="background: #FFD700; color: black; border: none; padding: 15px 30px; 
+                              border-radius: 10px; font-size: 1.1rem; cursor: pointer; font-weight: bold;">
+                    <i class="fas fa-donate"></i> Donate via PayPal
+                </button>
+                <button style="background: #28a745; color: white; border: none; padding: 15px 30px; 
+                              border-radius: 10px; font-size: 1.1rem; cursor: pointer; font-weight: bold;">
+                    <i class="fas fa-heart"></i> Support on Patreon
+                </button>
             </div>
         </div>
     </div>
 
-    <!-- KHOẢNG CÁCH SAU HƯỚNG DẪN -->
-    <div class="big-spacing"></div>
-
-    <!-- Thêm vào sau phần HƯỚNG DẪN và trước phần COMMENTS SECTION -->
-    <!-- KHOẢNG CÁCH SAU HƯỚNG DẪN -->
     <div class="big-spacing"></div>
 
     <!-- UPDATES SECTION -->
-    <div class="updates-section" id="updatesSection" style="display: none;">
+    <div class="updates-section" id="updatesSection">
         <div class="updates-container">
             <div class="updates-header">
-                <h2><i class="fas fa-bullhorn"></i> Updates <span class="updates-count" id="updatesCount">(0)</span>
-                </h2>
-
+                <h2><i class="fas fa-bullhorn"></i> Updates <span class="updates-count" id="updatesCount">(0)</span></h2>
+                
                 <!-- Search and Filter -->
                 <div class="updates-controls">
                     <div class="search-updates">
@@ -261,13 +239,12 @@
                         <select id="filterUpdates" onchange="filterUpdates()">
                             <option value="all">All Updates</option>
                             <option value="recent">Recent</option>
-                            <option value="oldest">Oldest</option>
                         </select>
                     </div>
                 </div>
             </div>
 
-            <!-- ============ UPDATE SLIDER ============ -->
+            <!-- Update Slider -->
             <div id="updatesSlider" class="updates-slider" style="display: none;">
                 <div class="slider-header">
                     <h3>Updates <span id="updateCounter">1/5</span></h3>
@@ -292,7 +269,6 @@
                     <div class="slider-dots" id="updateDots"></div>
                 </div>
             </div>
-            <!-- ============ END SLIDER ============ -->
 
             <!-- No updates message -->
             <div class="no-updates" id="noUpdates" style="display: none;">
@@ -303,21 +279,13 @@
                 </div>
             </div>
 
-            <!-- Not logged in message -->
-            <div class="login-to-view-updates" id="loginToViewUpdates" style="display: none;">
-                <div class="login-prompt">
-                    <i class="fas fa-lock"></i>
-                    <h3>Please log in to view updates</h3>
-                    <p>You need to be logged in to see the latest updates from the admin.</p>
-                    <button class="login-prompt-btn" onclick="showAuthModal('login')">
-                        <i class="fas fa-sign-in-alt"></i> Log in now
-                    </button>
-                </div>
+            <!-- Update previews for non-logged in users -->
+            <div class="update-previews" id="updatePreviews" style="display: none;">
+                <!-- Update previews will be loaded here -->
             </div>
         </div>
     </div>
 
-    <!-- KHOẢNG CÁCH SAU UPDATES -->
     <div class="big-spacing"></div>
 
     <!-- COMMENTS SECTION -->
@@ -325,7 +293,7 @@
         <div class="comments-container">
             <h2 class="comments-title">Comments <span class="comments-count" id="commentsCount">(0)</span></h2>
 
-            <!-- Form comment (chỉ hiện khi đã login) -->
+            <!-- Form comment -->
             <div class="comment-form" id="commentForm">
                 <div class="login-to-comment" id="loginToComment">
                     <p>
@@ -345,24 +313,21 @@
                 </div>
             </div>
 
-            <!-- Danh sách comments -->
+            <!-- Comments list -->
             <div class="comments-list" id="commentsList"></div>
         </div>
     </div>
 
-    <!-- KHOẢNG CÁCH DƯỚI CÙNG -->
     <div class="spacing"></div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="/js/userSystem.js"></script>
     <script src="/js/customModals.js"></script>
-    <script src="/js/file.js"></script>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
-        integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
-        crossorigin="anonymous"></script>
-    <!-- Scripts -->
-    <script src="/js/userSystem.js"></script>
-    <script src="/js/customModals.js"></script> <!-- Load trước -->
-    <script src="/js/file.js"></script> <!-- Load sau để dùng hàm từ customModals -->
+    <script src="/js/comments.js"></script>
+    <script src="/js/updates.js"></script>
+    <script src="/js/admin.js"></script>
+    <script src="/js/main.js"></script>
 </body>
 
 </html>
