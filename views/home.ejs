@@ -168,6 +168,14 @@
             cursor: pointer;
         }
     </style>
+    <script>
+        // Polyfill cho Screen Orientation API
+        if (!screen.orientation && screen.mozOrientation) {
+            screen.orientation = screen.mozOrientation;
+        } else if (!screen.orientation && screen.msOrientation) {
+            screen.orientation = screen.msOrientation;
+        }
+    </script>
 </head>
 
 <body onload="document.body.classList.add('loaded')" class="loading">
@@ -316,7 +324,8 @@
             <button id="authSubmitBtn" onclick="handleAuthSubmit()">Log in</button>
             
             <p class="auth-switch" id="authSwitch">
-                Don't have an account? <a href="#" onclick="toggleAuthMode()">Sign up</a>
+                Don't have an account? 
+            <a href="javascript:void(0)" onclick="toggleAuthMode(event)">Sign up</a>
             </p>
             <p class="auth-error" id="authError"></p>
         </div>
@@ -448,8 +457,8 @@
             <div class="comment-form" id="commentForm">
                 <div class="login-to-comment" id="loginToComment">
                     <p>
-                        <a href="#" onclick="showAuthModal('login')"
-                            style="color: #2196F3; text-decoration: underline;">
+                         <a href="javascript:void(0)" onclick="showAuthModal('login', event)"
+                            style="color: #2196F3; text-decoration: underline; cursor: pointer;">
                             Please login or sign up to comment
                         </a>
                     </p>
