@@ -12,7 +12,7 @@ function validateInput(text, minLength, maxLength, fieldName) {
     }
     return null;
 }
-// ============ CUSTOM UPDATE FORM ============
+// ===== UPDATE FORM MODAL =====
 function showUpdateForm() {
     const modal = document.createElement('div');
     modal.className = 'custom-modal-overlay';
@@ -22,7 +22,7 @@ function showUpdateForm() {
         <div class="custom-modal">
             <div class="modal-header">
                 <h2><i class="fas fa-plus-circle"></i> Add New Update</h2>
-                <button class="modal-close-btn" onclick="closeCustomModal('updateFormModal')">
+                <button class="modal-close-btn" onclick="closeUpdateForm()">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
@@ -57,10 +57,10 @@ function showUpdateForm() {
             </div>
             
             <div class="modal-footer">
-                <button class="cancel-btn" onclick="closeCustomModal('updateFormModal')">
+                <button class="cancel-btn" onclick="closeUpdateForm()">
                     <i class="fas fa-times"></i> Cancel
                 </button>
-                <button class="submit-btn" onclick="submitCustomUpdate()">
+                <button class="submit-btn" onclick="submitUpdate()">
                     <i class="fas fa-check"></i> Add Update
                 </button>
             </div>
@@ -86,6 +86,76 @@ function showUpdateForm() {
     // Focus on title input
     setTimeout(() => titleInput.focus(), 100);
 }
+
+function closeUpdateForm() {
+    const modal = document.getElementById('updateFormModal');
+    if (modal) {
+        modal.style.animation = 'modalFadeOut 0.3s ease forwards';
+        setTimeout(() => modal.remove(), 300);
+    }
+}
+
+function submitUpdate() {
+    const title = document.getElementById('updateTitle').value.trim();
+    const content = document.getElementById('updateContent').value.trim();
+    
+    if (!title) {
+        showCustomAlert('Error', 'Please enter a title for the update!', 'error');
+        document.getElementById('updateTitle').focus();
+        return;
+    }
+    
+    if (!content) {
+        showCustomAlert('Error', 'Please enter content for the update!', 'error');
+        document.getElementById('updateContent').focus();
+        return;
+    }
+    
+    if (title.length < 3) {
+        showCustomAlert('Error', 'Title must be at least 3 characters!', 'error');
+        return;
+    }
+    
+    // Get current user
+    const sessionUsername = localStorage.getItem('pickleball_session');
+    if (!sessionUsername) {
+        showCustomAlert('Error', 'You must be logged in to add updates!', 'error');
+        return;
+    }
+    
+    // Add update
+    let updates = JSON.parse(localStorage.getItem('pickleball_updates') || '[]');
+    const newUpdate = {
+        id: Date.now(),
+        title: title,
+        content: content,
+        author: sessionUsername,
+        createdAt: Date.now(),
+        isVisible: true
+    };
+    
+    updates.unshift(newUpdate);
+    localStorage.setItem('pickleball_updates', JSON.stringify(updates));
+    
+    closeUpdateForm();
+    
+    // Refresh updates display
+    if (typeof renderUpdates === 'function') {
+        renderUpdates();
+    }
+    
+    // Refresh admin panel if open
+    if (typeof loadAdminUpdatesList === 'function') {
+        loadAdminUpdatesList();
+    }
+    
+    showCustomAlert('Success', 'Update added successfully!', 'success');
+}
+
+// Make functions available globally
+window.showUpdateForm = showUpdateForm;
+window.closeUpdateForm = closeUpdateForm;
+window.submitUpdate = submitUpdate;
 
 function closeCustomModal(modalId) {
     const modal = document.getElementById(modalId);
@@ -134,7 +204,7 @@ function submitCustomUpdate() {
     }
 }
 
-// ============ CUSTOM CONFIRM MODAL ============
+// ===== CUSTOM CONFIRM MODAL =====
 function showCustomConfirm(title, message, onConfirm, onCancel = null) {
     const modal = document.createElement('div');
     modal.className = 'custom-modal-overlay';
@@ -142,8 +212,8 @@ function showCustomConfirm(title, message, onConfirm, onCancel = null) {
     
     modal.innerHTML = `
         <div class="custom-modal confirm-modal">
-            <div class="modal-header">
-                <h2><i class="fas fa-exclamation-triangle"></i> ${title}</h2>
+            <div class="modal-header" style="border-bottom-color: #FF9800">
+                <h2><i class="fas fa-exclamation-triangle" style="color: #FF9800"></i> ${title}</h2>
                 <button class="modal-close-btn" onclick="closeCustomModal('confirmModal')">
                     <i class="fas fa-times"></i>
                 </button>
@@ -151,16 +221,20 @@ function showCustomConfirm(title, message, onConfirm, onCancel = null) {
             
             <div class="modal-body">
                 <div class="confirm-icon">
-                    <i class="fas fa-question-circle"></i>
+                    <i class="fas fa-question-circle" style="color: #FF9800; font-size: 4rem;"></i>
                 </div>
-                <p class="confirm-message">${message}</p>
+                <p class="confirm-message" style="text-align: center; color: #ddd; font-size: 1.1rem; line-height: 1.5;">
+                    ${message}
+                </p>
             </div>
             
-            <div class="modal-footer">
-                <button class="cancel-btn" onclick="closeCustomModal('confirmModal')">
+            <div class="modal-footer" style="justify-content: center; gap: 20px;">
+                <button class="cancel-btn" onclick="handleCancelConfirm()" 
+                        style="background: rgba(255, 255, 255, 0.1); color: #aaa;">
                     <i class="fas fa-times"></i> Cancel
                 </button>
-                <button class="confirm-btn" onclick="handleConfirmAction()">
+                <button class="confirm-btn" onclick="handleConfirmAction()" 
+                        style="background: linear-gradient(135deg, #ff4757, #ff3838); color: white;">
                     <i class="fas fa-check"></i> Confirm
                 </button>
             </div>
@@ -177,6 +251,32 @@ function showCustomConfirm(title, message, onConfirm, onCancel = null) {
 function handleConfirmAction() {
     if (window.confirmCallback) {
         window.confirmCallback();
+    }
+    closeCustomModal('confirmModal');
+}
+
+function handleCancelConfirm() {
+    if (window.cancelCallback) {
+        window.cancelCallback();
+    }
+    closeCustomModal('confirmModal');
+}
+
+function closeCustomModal(modalId) {
+    const modal = document.getElementById(modalId);
+    if (modal) {
+        modal.style.animation = 'modalFadeOut 0.3s ease forwards';
+        setTimeout(() => {
+            if (modal.parentElement) {
+                modal.remove();
+            }
+        }, 300);
+    }
+}
+
+function handleConfirmAction() {
+    if (window.confirmCallback) {
+        window.confirmCallback();
         window.confirmCallback = null;
     }
     closeCustomModal('confirmModal');
@@ -184,13 +284,6 @@ function handleConfirmAction() {
 
 // ============ CUSTOM ALERT MODAL ============
 function showCustomAlert(title, message, type = 'info') {
-    const icons = {
-        'success': 'fas fa-check-circle',
-        'error': 'fas fa-exclamation-circle',
-        'warning': 'fas fa-exclamation-triangle',
-        'info': 'fas fa-info-circle'
-    };
-    
     const colors = {
         'success': '#4CAF50',
         'error': '#ff4757',
@@ -198,25 +291,33 @@ function showCustomAlert(title, message, type = 'info') {
         'info': '#2196F3'
     };
     
+    const icons = {
+        'success': 'fa-check-circle',
+        'error': 'fa-exclamation-circle',
+        'warning': 'fa-exclamation-triangle',
+        'info': 'fa-info-circle'
+    };
+    
     const modal = document.createElement('div');
     modal.className = 'custom-modal-overlay';
     modal.id = 'alertModal';
     
     modal.innerHTML = `
-        <div class="custom-modal alert-modal">
+        <div class="custom-modal" style="max-width: 400px;">
             <div class="modal-header" style="border-bottom-color: ${colors[type]}">
-                <h2><i class="${icons[type]}" style="color: ${colors[type]}"></i> ${title}</h2>
+                <h2><i class="fas ${icons[type]}" style="color: ${colors[type]}"></i> ${title}</h2>
                 <button class="modal-close-btn" onclick="closeCustomModal('alertModal')">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
             
             <div class="modal-body">
-                <p class="alert-message">${message}</p>
+                <p style="color: #ddd; text-align: center; font-size: 1.1rem;">${message}</p>
             </div>
             
-            <div class="modal-footer">
-                <button class="ok-btn" onclick="closeCustomModal('alertModal')">
+            <div class="modal-footer" style="justify-content: center;">
+                <button class="ok-btn" onclick="closeCustomModal('alertModal')"
+                        style="background: ${colors[type]}; color: white; min-width: 100px;">
                     OK
                 </button>
             </div>
@@ -224,13 +325,6 @@ function showCustomAlert(title, message, type = 'info') {
     `;
     
     document.body.appendChild(modal);
-    
-    // Auto close after 5 seconds for success/info
-    if (type === 'success' || type === 'info') {
-        setTimeout(() => {
-            closeCustomModal('alertModal');
-        }, 5000);
-    }
 }
 
 // ============ CUSTOM EDIT UPDATE FORM ============
