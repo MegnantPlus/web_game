@@ -2412,3 +2412,26 @@ body.loaded .loading-overlay {
     font-size: 1rem;
     color: #aaa;
 }
+/* Thêm vào style.css */
+/* Reset scroll khi không fullscreen */
+body:not(.game-fullscreen) {
+    overflow: auto !important;
+    position: relative !important;
+    height: auto !important;
+}
+
+/* Class để khóa scroll khi game fullscreen */
+body.game-fullscreen {
+    overflow: hidden !important;
+    position: fixed !important;
+    width: 100% !important;
+    height: 100% !important;
+}
+
+/* Đảm bảo game player khi không fullscreen không ảnh hưởng scroll */
+.game-player:not(.fullscreen) {
+    position: relative !important;
+    max-width: 800px !important;
+    margin: 80px auto 0 !important;
+    overflow: visible !important;
+}

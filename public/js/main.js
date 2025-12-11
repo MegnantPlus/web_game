@@ -1,4 +1,9 @@
 // main.js - Main Application File
+const IS_GITHUB_PAGES = window.location.hostname.includes('github.io');
+const BASE_PATH = IS_GITHUB_PAGES ? '/YOUR_REPO_NAME/' : '/'; // Thay YOUR_REPO_NAME bằng tên repo thật
+
+console.log('Environment:', IS_GITHUB_PAGES ? 'GitHub Pages' : 'Local');
+console.log('Base Path:', BASE_PATH);
 let showCommentsToPublic = true;
 let isFullscreen = false;
 let currentUser = null;
@@ -998,33 +1003,108 @@ function startGame() {
 }
 
 function exitGame() {
-    // Xóa iframe game
+    console.log('Exiting game...');
+    
+    // 1. Xóa iframe game
     const gameFrame = document.getElementById('gameFrame');
     if (gameFrame) {
         gameFrame.remove();
+        console.log('Game frame removed');
     }
     
-    // Xóa nút exit
+    // 2. Xóa nút exit
     const exitBtn = document.querySelector('.exit-game-btn');
-    if (exitBtn) exitBtn.remove();
-    
-    // Khôi phục placeholder về ban đầu
-    const placeholder = document.getElementById('gamePlaceholder');
-    placeholder.innerHTML = `
-        <div class="placeholder-content">
-            <button class="run-game-btn" onclick="startGame()">
-                ▶ RUN GAME
-            </button>
-            <p>Click RUN GAME to start playing</p>
-        </div>
-    `;
-    
-    // Thoát fullscreen nếu đang ở chế độ fullscreen
-    if (isFullscreen) {
-        exitFullscreen(); // DÙNG HÀM MỚI
+    if (exitBtn) {
+        exitBtn.remove();
+        console.log('Exit button removed');
     }
     
+    // 3. Khôi phục placeholder về ban đầu
+    const placeholder = document.getElementById('gamePlaceholder');
+    if (placeholder) {
+        placeholder.innerHTML = `
+            <div class="placeholder-content">
+                <button class="run-game-btn" onclick="startGame()">
+                    ▶ RUN GAME
+                </button>
+                <p>Click RUN GAME to start playing</p>
+            </div>
+        `;
+        console.log('Placeholder restored');
+    }
+    
+    // 4. THOÁT FULLSCREEN ĐÚNG CÁCH
+    if (isFullscreen) {
+        console.log('Exiting fullscreen...');
+        
+        // Đảm bảo mở khóa tất cả
+        restoreScrollAndOrientation();
+        
+        // Gọi hàm exitFullscreen
+        exitFullscreen();
+        
+        // Reset lại biến
+        isFullscreen = false;
+    }
+    
+    // 5. ĐẢM BẢO BODY CÓ THỂ SCROLL LẠI
+    restoreBodyScroll();
+    
+    console.log('Game exited successfully');
     showNotification('Game exited', 'info');
+}
+
+function restoreBodyScroll() {
+    console.log('Restoring body scroll...');
+    
+    // Đảm bảo body có thể scroll
+    document.body.style.overflow = 'auto';
+    document.body.style.position = 'static';
+    document.body.style.height = 'auto';
+    document.body.style.width = 'auto';
+    
+    // Đảm bảo html có thể scroll
+    document.documentElement.style.overflow = 'auto';
+    document.documentElement.style.position = 'static';
+    
+    // Xóa lớp locked nếu có
+    document.body.classList.remove('no-scroll', 'game-fullscreen');
+    
+    console.log('Body scroll restored');
+}
+
+function restoreScrollAndOrientation() {
+    console.log('Restoring scroll and orientation...');
+    
+    // 1. Mở khóa orientation nếu đang khóa
+    if (screen.orientation && screen.orientation.unlock) {
+        try {
+            screen.orientation.unlock();
+            console.log('Orientation unlocked');
+        } catch (err) {
+            console.log('Orientation unlock failed:', err);
+        }
+    }
+    
+    // 2. Xóa overlay fullscreen nếu có
+    const overlay = document.getElementById('fullscreenOverlay');
+    if (overlay) {
+        overlay.remove();
+        console.log('Overlay removed');
+    }
+    
+    // 3. Reset game player style
+    const gamePlayer = document.getElementById('gamePlayer');
+    if (gamePlayer) {
+        gamePlayer.classList.remove('fullscreen');
+        gamePlayer.style.cssText = ''; // Xóa tất cả inline styles
+        console.log('Game player styles reset');
+    }
+    
+    // 4. Force reflow
+    if (gamePlayer) {
+        gamePlayer.offsetHeight; // Trigger reflow
+    }
 }
 
 // Fullscreen functions
@@ -1069,6 +1149,10 @@ function enterFullscreen(element) {
 
 function applyMobileFullscreen(element) {
     // Áp dụng style fullscreen cho mobile
+    console.log('Applying mobile fullscreen');
+    
+    // Thêm class để khóa scroll body
+    document.body.classList.add('game-fullscreen');
     element.classList.add('fullscreen');
     element.style.position = 'fixed';
     element.style.top = '0';
@@ -1141,27 +1225,43 @@ function applyDesktopFullscreen(element) {
 }
 
 function exitFullscreen() {
+    console.log('exitFullscreen called');
+    
     const gamePlayer = document.getElementById('gamePlayer');
     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     
     if (isMobile) {
+        console.log('Mobile exit fullscreen');
         // Trên mobile: mở khóa orientation
         if (screen.orientation && screen.orientation.unlock) {
-            screen.orientation.unlock();
+            try {
+                screen.orientation.unlock();
+                console.log('Screen orientation unlocked');
+            } catch (err) {
+                console.log('Failed to unlock orientation:', err);
+            }
         }
         
         // Xóa style fullscreen
-        gamePlayer.classList.remove('fullscreen');
-        gamePlayer.style.cssText = '';
+        if (gamePlayer) {
+            gamePlayer.classList.remove('fullscreen');
+            gamePlayer.style.cssText = '';
+            console.log('Game player styles cleared');
+        }
         
-        // Hiển thị lại các phần tử
-        document.body.style.overflow = 'auto';
+        // Đảm bảo scroll được khôi phục
+        restoreBodyScroll();
         
         // Xóa overlay
         const overlay = document.getElementById('fullscreenOverlay');
-        if (overlay) overlay.remove();
+        if (overlay) {
+            overlay.remove();
+            console.log('Fullscreen overlay removed');
+        }
+        
     } else {
-        // Trên desktop: thoát fullscreen
+        console.log('Desktop exit fullscreen');
+        // Trên desktop: thoát fullscreen API
         if (document.exitFullscreen) {
             document.exitFullscreen();
         } else if (document.mozCancelFullScreen) {
@@ -1172,10 +1272,16 @@ function exitFullscreen() {
             document.msExitFullscreen();
         }
         
-        gamePlayer.classList.remove('fullscreen');
+        if (gamePlayer) {
+            gamePlayer.classList.remove('fullscreen');
+            console.log('Fullscreen class removed');
+        }
     }
     
-    isFullscreen = false;
+    // Luôn restore body scroll
+    restoreBodyScroll();
+    
+    console.log('Fullscreen exit complete');
 }
 
 function setupFullscreenListener() {
@@ -1242,23 +1348,39 @@ function formatTimeAgo(timestamp) {
 }
 
 function setupSmoothScroll() {
-    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-        // Bỏ qua các link trong auth modal
-        if (anchor.closest('.auth-modal') || anchor.closest('.modal-content')) {
+    document.querySelectorAll('a').forEach(anchor => {
+        // Bỏ qua các link đến external site
+        if (anchor.href && 
+            (anchor.href.startsWith('http') || 
+             anchor.href.startsWith('mailto') || 
+             anchor.href.startsWith('tel'))) {
             return;
         }
         
         anchor.addEventListener('click', function(e) {
-            e.preventDefault();
-            const targetId = this.getAttribute('href');
-            if (targetId === '#') return;
+            const href = this.getAttribute('href');
             
-            const targetElement = document.querySelector(targetId);
-            if (targetElement) {
-                window.scrollTo({
-                    top: targetElement.offsetTop - 80,
-                    behavior: 'smooth'
-                });
+            // Nếu là hash link và không phải là link auth
+            if (href && href.startsWith('#') && href !== '#') {
+                e.preventDefault();
+                
+                const targetId = href;
+                const targetElement = document.querySelector(targetId);
+                
+                if (targetElement) {
+                    // Smooth scroll với offset cho header fixed
+                    window.scrollTo({
+                        top: targetElement.offsetTop - 80,
+                        behavior: 'smooth'
+                    });
+                    
+                    // Update URL hash mà không reload
+                    if (history.pushState) {
+                        history.pushState(null, null, href);
+                    } else {
+                        window.location.hash = href;
+                    }
+                }
             }
         });
     });
@@ -1366,8 +1488,19 @@ function checkSession() {
 setInterval(checkSession, 2000);
 
 // Gọi ngay khi load
+// Sửa phần DOMContentLoaded trong main.js
 document.addEventListener('DOMContentLoaded', function() {
     initializePage();
+    
+    // Ngăn default behavior cho tất cả các hash links
+    document.addEventListener('click', function(e) {
+        const target = e.target.closest('a');
+        if (target && target.getAttribute('href') === '#') {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }
+    }, true);
     
     // Auto check after 1 second
     setTimeout(checkSession, 1000);
@@ -1438,6 +1571,80 @@ function initializePage() {
     
     console.log('✅ Page initialized');
 }
+// Thêm vào main.js
+function scrollToSection(sectionId) {
+    const target = document.querySelector(sectionId);
+    if (target) {
+        window.scrollTo({
+            top: target.offsetTop - 80,
+            behavior: 'smooth'
+        });
+        
+        // Update URL mà không reload
+        if (history.pushState) {
+            history.pushState(null, null, sectionId);
+        }
+    }
+    return false; // Ngăn default behavior
+}
+// Thêm vào main.js
+function setupFullscreenExitListeners() {
+    // ESC key để exit game
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape' && isFullscreen) {
+            console.log('ESC pressed, exiting game');
+            exitGame();
+        }
+    });
+    
+    // Xử lý khi page được focus lại (tránh bị lock)
+    window.addEventListener('focus', function() {
+        if (!isFullscreen && document.body.classList.contains('game-fullscreen')) {
+            console.log('Page refocused, restoring scroll');
+            restoreBodyScroll();
+        }
+    });
+}
 
+// Gọi trong initializePage()
+function initializePage() {
+    console.log('🔄 Initializing page...');
+    
+    // Tạo admin account nếu chưa có
+    createAdminAccount();
+    
+    // Load session
+    loadSession();
+    
+    // Update UI based on login status
+    updateAuthUI();
+    
+    // Render comments ngay lập tức
+    renderComments();
+    
+    // Render updates
+    renderUpdates();
+    
+    // Setup event listeners
+    setupSmoothScroll();
+    setupFullscreenListener();
+    setupOrientationListeners();
+    setupFullscreenExitListeners(); // THÊM DÒNG NÀY
+    
+    console.log('✅ Page initialized');
+}   
+// Thêm vào main.js để debug
+function checkScrollStatus() {
+    console.log('=== SCROLL STATUS ===');
+    console.log('Body overflow:', document.body.style.overflow);
+    console.log('Body position:', document.body.style.position);
+    console.log('HTML overflow:', document.documentElement.style.overflow);
+    console.log('isFullscreen:', isFullscreen);
+    console.log('Body has no-scroll class:', document.body.classList.contains('no-scroll'));
+    console.log('Body has game-fullscreen class:', document.body.classList.contains('game-fullscreen'));
+    console.log('========================');
+}
 
+// Có thể gọi sau khi exit game
+// checkScrollStatus();
 
