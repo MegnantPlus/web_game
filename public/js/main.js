@@ -825,6 +825,7 @@ function renderUpdateSlider(updates) {
 }
 
 // ============ FIXED VERSION - KHÔNG LỘ NỘI DUNG ============
+// ============ FIXED VERSION - HIỂN THỊ TÊN THẬT, ẨN NỘI DUNG ============
 function renderUpdatePreviews(updates) {
     const previewsContainer = document.getElementById('updatePreviews');
     if (!previewsContainer) return;
@@ -834,17 +835,18 @@ function renderUpdatePreviews(updates) {
         return;
     }
     
-    // CHỈ HIỂN THỊ THÔNG TIN TỐI THIỂU - KHÔNG CÓ NỘI DUNG THẬT
+    // HIỂN THỊ TIÊU ĐỀ THẬT, NHƯNG NỘI DUNG VẪN ẨN
     previewsContainer.innerHTML = `
         <div class="update-preview">
-            <h4><i class="fas fa-newspaper"></i> Update #${currentPreviewIndex + 1}</h4>
+            <!-- HIỂN THỊ TIÊU ĐỀ THẬT CỦA UPDATE -->
+            <h4><i class="fas fa-newspaper"></i> ${updates[currentPreviewIndex].title}</h4>
             
-            <!-- CHỈ 1 DÒNG THÔNG BÁO - KHÔNG CÓ NỘI DUNG UPDATE -->
+            <!-- KHÔNG HIỂN THỊ NỘI DUNG THẬT, CHỈ HIỂN THỊ THÔNG BÁO LOGIN -->
             <div style="background: rgba(255,152,0,0.1); border: 1px solid rgba(255,152,0,0.3); 
                         border-radius: 8px; padding: 40px 20px; text-align: center; 
                         color: #FF9800; font-weight: bold; margin: 20px 0;">
                 <i class="fas fa-lock"></i> 
-                <p style="margin: 10px 0;">Login to read this update</p>
+                <p style="margin: 10px 0;">Login to read this update content</p>
                 <a onclick="showAuthModal('login')" 
                    style="color: #2196F3; cursor: pointer; text-decoration: underline; font-size: 0.9rem;">
                    Click here to login
@@ -852,7 +854,7 @@ function renderUpdatePreviews(updates) {
             </div>
             
             <div style="color: #666; font-size: 0.9rem;">
-                <small><i class="far fa-calendar"></i> Update posted</small>
+                <small><i class="far fa-calendar"></i> ${new Date(updates[currentPreviewIndex].createdAt).toLocaleDateString()}</small>
             </div>
         </div>
         
@@ -947,7 +949,7 @@ function startGame() {
         // Tạo iframe để load game
         const iframe = document.createElement('iframe');
         iframe.id = 'gameFrame';
-        iframe.src = 'Game/game.html';
+        iframe.src = 'Game/Game.html';
         iframe.style.cssText = `
             position: absolute;
             top: 0;
