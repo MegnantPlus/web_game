@@ -3,6 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Thêm các meta tags này -->
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <title>Pickleball Champions</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
@@ -189,9 +193,9 @@
             
             <!-- Menu buttons - now on the right side of logo -->
             <ul class="header-menu">
-                <li><a href="#introduction">Introduce</a></li>
-                <li><a href="#donate">Donate</a></li>
-                <li><a href="#updatesSection">Updates</a></li>
+                <li><a href="#introduction" onclick="return scrollToSection('#introduction')">Introduce</a></li>
+                <li><a href="#donate" onclick="return scrollToSection('#donate')">Donate</a></li>
+                <li><a href="#updatesSection" onclick="return scrollToSection('#updatesSection')">Updates</a></li>
             </ul>
         </div>
 
@@ -323,10 +327,12 @@
             
             <button id="authSubmitBtn" onclick="handleAuthSubmit()">Log in</button>
             
-            <p class="auth-switch" id="authSwitch">
-                Don't have an account? 
-            <a href="javascript:void(0)" onclick="toggleAuthMode(event)">Sign up</a>
-            </p>
+                            <!-- Auth modal links -->
+                    <p class="auth-switch" id="authSwitch">
+                        Don't have an account? 
+                        <a href="javascript:void(0);" onclick="toggleAuthMode(event)">Sign up</a>
+                    </p>
+
             <p class="auth-error" id="authError"></p>
         </div>
     </div>
@@ -457,7 +463,7 @@
             <div class="comment-form" id="commentForm">
                 <div class="login-to-comment" id="loginToComment">
                     <p>
-                         <a href="javascript:void(0)" onclick="showAuthModal('login', event)"
+                        <a href="javascript:void(0);" onclick="showAuthModal('login', event)"
                             style="color: #2196F3; text-decoration: underline; cursor: pointer;">
                             Please login or sign up to comment
                         </a>

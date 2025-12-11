@@ -1,4 +1,9 @@
 // main.js - Main Application File
+const IS_GITHUB_PAGES = window.location.hostname.includes('github.io');
+const BASE_PATH = IS_GITHUB_PAGES ? '/YOUR_REPO_NAME/' : '/'; // Thay YOUR_REPO_NAME bằng tên repo thật
+
+console.log('Environment:', IS_GITHUB_PAGES ? 'GitHub Pages' : 'Local');
+console.log('Base Path:', BASE_PATH);
 let showCommentsToPublic = true;
 let isFullscreen = false;
 let currentUser = null;
@@ -1242,23 +1247,39 @@ function formatTimeAgo(timestamp) {
 }
 
 function setupSmoothScroll() {
-    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-        // Bỏ qua các link trong auth modal
-        if (anchor.closest('.auth-modal') || anchor.closest('.modal-content')) {
+    document.querySelectorAll('a').forEach(anchor => {
+        // Bỏ qua các link đến external site
+        if (anchor.href && 
+            (anchor.href.startsWith('http') || 
+             anchor.href.startsWith('mailto') || 
+             anchor.href.startsWith('tel'))) {
             return;
         }
         
         anchor.addEventListener('click', function(e) {
-            e.preventDefault();
-            const targetId = this.getAttribute('href');
-            if (targetId === '#') return;
+            const href = this.getAttribute('href');
             
-            const targetElement = document.querySelector(targetId);
-            if (targetElement) {
-                window.scrollTo({
-                    top: targetElement.offsetTop - 80,
-                    behavior: 'smooth'
-                });
+            // Nếu là hash link và không phải là link auth
+            if (href && href.startsWith('#') && href !== '#') {
+                e.preventDefault();
+                
+                const targetId = href;
+                const targetElement = document.querySelector(targetId);
+                
+                if (targetElement) {
+                    // Smooth scroll với offset cho header fixed
+                    window.scrollTo({
+                        top: targetElement.offsetTop - 80,
+                        behavior: 'smooth'
+                    });
+                    
+                    // Update URL hash mà không reload
+                    if (history.pushState) {
+                        history.pushState(null, null, href);
+                    } else {
+                        window.location.hash = href;
+                    }
+                }
             }
         });
     });
@@ -1366,8 +1387,19 @@ function checkSession() {
 setInterval(checkSession, 2000);
 
 // Gọi ngay khi load
+// Sửa phần DOMContentLoaded trong main.js
 document.addEventListener('DOMContentLoaded', function() {
     initializePage();
+    
+    // Ngăn default behavior cho tất cả các hash links
+    document.addEventListener('click', function(e) {
+        const target = e.target.closest('a');
+        if (target && target.getAttribute('href') === '#') {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }
+    }, true);
     
     // Auto check after 1 second
     setTimeout(checkSession, 1000);
@@ -1438,6 +1470,21 @@ function initializePage() {
     
     console.log('✅ Page initialized');
 }
-
+// Thêm vào main.js
+function scrollToSection(sectionId) {
+    const target = document.querySelector(sectionId);
+    if (target) {
+        window.scrollTo({
+            top: target.offsetTop - 80,
+            behavior: 'smooth'
+        });
+        
+        // Update URL mà không reload
+        if (history.pushState) {
+            history.pushState(null, null, sectionId);
+        }
+    }
+    return false; // Ngăn default behavior
+}
 
 
