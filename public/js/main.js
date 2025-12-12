@@ -13,12 +13,26 @@ let currentPreviewIndex = 0; // Thêm dòng này
 let isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
 // SIMPLE HASH FUNCTION - CHẠY CHÍNH XÁC
-function simpleHash(password) {
-    let hash = 5381;
-    for (let i = 0; i < password.length; i++) {
-        hash = (hash * 33) ^ password.charCodeAt(i);
-    }
-    return (hash >>> 0).toString(36);
+// Thêm test function để debug
+function testHashFunction() {
+    console.log('=== TESTING HASH FUNCTION ===');
+    const testPassword = '010101';
+    const hashed = simpleHash(testPassword);
+    console.log('Password:', testPassword);
+    console.log('Hashed:', hashed);
+    console.log('Hash length:', hashed.length);
+    console.log('Hash type:', typeof hashed);
+    console.log('=== END TEST ===');
+}
+
+// Gọi trong initializePage() để test
+function initializePage() {
+    console.log('🔄 Initializing page...');
+    
+    // Test hash function
+    testHashFunction();
+    
+    // ... phần còn lại của initializePage ...
 }
 
 // TẠO ADMIN TÀI KHOẢN TỰ ĐỘNG
@@ -188,111 +202,194 @@ function handleAuthSubmit() {
     document.querySelectorAll('.auth-form input').forEach(input => {
         input.classList.remove('error');
     });
+    errorElement.textContent = '';
+    errorElement.style.color = ''; // Reset màu
     
     if (isSignupMode) {
-        // SIGN UP - 3 trường
+        // ============ SIGN UP ============
         const username = document.getElementById('authUsername').value.trim();
         const email = document.getElementById('authEmail').value.trim();
         const password = document.getElementById('authPassword').value;
         
+        console.log('Sign up attempt:', { username, email, passwordLength: password.length });
+        
+        // Validate inputs
         if (!username || !email || !password) {
             errorElement.textContent = 'Please fill in all fields';
-            // Thêm class error cho input trống
+            errorElement.style.color = '#ff4757';
             if (!username) document.getElementById('authUsername').classList.add('error');
             if (!email) document.getElementById('authEmail').classList.add('error');
             if (!password) document.getElementById('authPassword').classList.add('error');
             return;
         }
         
+        // Validate username
+        if (username.length < 3 || username.length > 20) {
+            errorElement.textContent = 'Username must be 3-20 characters';
+            errorElement.style.color = '#ff4757';
+            document.getElementById('authUsername').classList.add('error');
+            return;
+        }
+        
         // Validate email
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
             errorElement.textContent = 'Please enter a valid email address';
+            errorElement.style.color = '#ff4757';
             document.getElementById('authEmail').classList.add('error');
+            return;
+        }
+        
+        // Validate password
+        if (password.length < 8) {
+            errorElement.textContent = 'Password must be at least 8 characters';
+            errorElement.style.color = '#ff4757';
+            document.getElementById('authPassword').classList.add('error');
             return;
         }
         
         // Get users from localStorage
         let users = JSON.parse(localStorage.getItem('pickleball_users') || '[]');
+        console.log('Existing users count:', users.length);
         
         // Check if username exists
-        if (users.find(u => u.username.toLowerCase() === username.toLowerCase())) {
+        const existingUsername = users.find(u => u.username.toLowerCase() === username.toLowerCase());
+        if (existingUsername) {
             errorElement.textContent = 'Username already exists';
+            errorElement.style.color = '#ff4757';
             document.getElementById('authUsername').classList.add('error');
+            console.log('Username exists:', existingUsername);
             return;
         }
         
         // Check if email exists
-        if (users.find(u => u.email && u.email.toLowerCase() === email.toLowerCase())) {
+        const existingEmail = users.find(u => u.email && u.email.toLowerCase() === email.toLowerCase());
+        if (existingEmail) {
             errorElement.textContent = 'Email already registered';
+            errorElement.style.color = '#ff4757';
             document.getElementById('authEmail').classList.add('error');
+            console.log('Email exists:', existingEmail);
             return;
         }
         
-        if (username.length < 3 || username.length > 20) {
-            errorElement.textContent = 'Username must be 3-20 characters';
-            document.getElementById('authUsername').classList.add('error');
-            return;
-        }
+        // Create new user
+        const newUser = {
+            id: Date.now().toString(),
+            username: username,
+            email: email,
+            password: simpleHash(password),
+            createdAt: Date.now(),
+            banned: false,
+            admin: false,
+            isBanned: false,
+            isAdmin: false
+        };
         
-        // ĐỔI TỪ 6 KÍ TỰ THÀNH 8 KÍ TỰ
-        if (password.length < 8) {
-            errorElement.textContent = 'Password must be at least 8 characters';
-            document.getElementById('authPassword').classList.add('error');
-            return;
-        }
+        console.log('Creating new user:', newUser);
         
-        // ... phần còn lại của sign up ...
+        // Add to users array
+        users.push(newUser);
+        
+        // Save to localStorage
+        localStorage.setItem('pickleball_users', JSON.stringify(users));
+        console.log('User saved to localStorage. Total users:', users.length);
+        
+        // SUCCESS - Hiển thị thông báo thành công
+        errorElement.textContent = '✅ Account created successfully! Please log in.';
+        errorElement.style.color = '#4CAF50';
+        
+        // Tự động chuyển sang login form sau 2 giây
+        setTimeout(() => {
+            // Chuyển sang login mode
+            const title = document.getElementById('modalTitle');
+            const submitBtn = document.getElementById('authSubmitBtn');
+            const switchText = document.getElementById('authSwitch');
+            
+            // Ẩn username field
+            const usernameField = document.getElementById('usernameField');
+            if (usernameField) {
+                usernameField.style.display = 'none';
+            }
+            
+            // Đặt lại form thành login mode
+            title.textContent = 'Log in';
+            submitBtn.textContent = 'Log in';
+            switchText.innerHTML = 'Don\'t have an account? <a href="javascript:void(0)" onclick="toggleAuthMode(event)">Sign up</a>';
+            
+            // Giữ email đã nhập, xóa các trường khác
+            document.getElementById('authEmail').value = email;
+            document.getElementById('authUsername').value = '';
+            document.getElementById('authPassword').value = '';
+            
+            // Reset error message
+            errorElement.textContent = '';
+            errorElement.style.color = '';
+            
+        }, 2000);
         
     } else {
-        // LOGIN - 2 trường
+        // ============ LOGIN ============
         const email = document.getElementById('authEmail').value.trim();
         const password = document.getElementById('authPassword').value;
         
+        console.log('Login attempt:', { email, passwordLength: password.length });
+        
+        // Validate inputs
         if (!email || !password) {
             errorElement.textContent = 'Please fill in all fields';
-            // Thêm class error cho input trống
+            errorElement.style.color = '#ff4757';
             if (!email) document.getElementById('authEmail').classList.add('error');
             if (!password) document.getElementById('authPassword').classList.add('error');
             return;
         }
         
-        // Validate email
+        // Validate email format
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
         if (!emailRegex.test(email)) {
             errorElement.textContent = 'Please enter a valid email address';
+            errorElement.style.color = '#ff4757';
             document.getElementById('authEmail').classList.add('error');
             return;
         }
         
         // Get users from localStorage
-        let users = JSON.parse(localStorage.getItem('pickleball_users') || '[]');
+        const users = JSON.parse(localStorage.getItem('pickleball_users') || '[]');
+        console.log('Searching for email:', email.toLowerCase());
+        console.log('All users:', users.map(u => ({ email: u.email, username: u.username })));
         
-        // Tìm user bằng email
+        // Find user by email
         const user = users.find(u => u.email && u.email.toLowerCase() === email.toLowerCase());
         
         if (!user) {
             errorElement.textContent = 'Invalid email or password';
+            errorElement.style.color = '#ff4757';
             document.getElementById('authEmail').classList.add('error');
             document.getElementById('authPassword').classList.add('error');
+            console.log('User not found');
             return;
         }
         
         const hashedPassword = simpleHash(password);
+        console.log('Provided hash:', hashedPassword);
+        console.log('Stored hash:', user.password);
         
         if (user.password !== hashedPassword) {
             errorElement.textContent = 'Invalid email or password';
+            errorElement.style.color = '#ff4757';
             document.getElementById('authEmail').classList.add('error');
             document.getElementById('authPassword').classList.add('error');
+            console.log('Password mismatch');
             return;
         }
         
-        if (user.isBanned) {
+        if (user.banned || user.isBanned) {
             errorElement.textContent = 'This account has been banned!';
+            errorElement.style.color = '#ff4757';
             return;
         }
         
-        // Success
+        // SUCCESS - Login
+        console.log('Login successful:', user.username);
         currentUser = user;
         saveSession();
         closeAuthModal();
@@ -977,7 +1074,7 @@ function startGame() {
         <div class="placeholder-content">
             <h2 style="color: white; margin-bottom: 20px;">🎮 Game Loading...</h2>
             <p style="color: #aaa; margin-bottom: 30px;">
-                ${isMobile ? 'Game will start in landscape mode' : 'Game will start in fullscreen mode'}
+                ${isMobile ? 'Game will start in fullscreen landscape mode' : 'Game will start in fullscreen mode'}
             </p>
             <div class="loading-spinner"></div>
         </div>
@@ -1004,14 +1101,22 @@ function startGame() {
         // Thêm iframe vào placeholder
         placeholder.appendChild(iframe);
         
-        // Tự động vào fullscreen
-        if (!isFullscreen) {
-            toggleFullscreen();
+        // Nếu là mobile, dùng mobile fullscreen đặc biệt
+        if (isMobile) {
+            // Tự động vào fullscreen mobile
+            setTimeout(() => {
+                enterMobileFullscreen(document.getElementById('gamePlayer'));
+            }, 500);
+        } else {
+            // Desktop: fullscreen bình thường
+            if (!isFullscreen) {
+                toggleFullscreen();
+            }
         }
         
         // Thêm nút exit
         const exitBtn = document.createElement('button');
-        exitBtn.className = 'exit-game-btn';
+        exitBtn.className = 'exit-game-btn' + (isMobile ? ' mobile' : '');
         exitBtn.innerHTML = '✕';
         exitBtn.title = 'Exit Game';
         exitBtn.onclick = exitGame;
@@ -1152,28 +1257,135 @@ function enterFullscreen(element) {
 }
 
 function enterMobileFullscreen(element) {
-    console.log('MOBILE: Rotating to landscape');
+    console.log('MOBILE: Entering true fullscreen');
     
-    // 1. Lock orientation thành landscape
+    // 1. Lock orientation to landscape
     if (screen.orientation && screen.orientation.lock) {
         screen.orientation.lock('landscape')
             .then(() => {
                 console.log('Screen locked to landscape');
-                applyMobileFullscreenStyles(element);
+                applyTrueMobileFullscreen(element);
             })
             .catch(err => {
                 console.log('Failed to lock orientation:', err);
-                applyMobileFullscreenStyles(element);
+                applyTrueMobileFullscreen(element);
             });
     } else {
-        applyMobileFullscreenStyles(element);
+        applyTrueMobileFullscreen(element);
     }
     
-    // 2. Khóa scroll cho mobile
-    document.body.style.overflow = 'hidden';
-    document.documentElement.style.overflow = 'hidden';
+    // 2. Block all browser UI
+    blockBrowserUI();
+    
+    // 3. Prevent zoom and gestures
+    preventZoomAndGestures();
+    
+    // 4. Apply mobile-specific styles
+    applyMobileFullscreenStyles(element);
     
     isFullscreen = true;
+}
+
+function applyTrueMobileFullscreen(element) {
+    console.log('Applying true mobile fullscreen');
+    
+    // 1. Thêm class đặc biệt
+    element.classList.add('mobile-fullscreen');
+    document.body.classList.add('mobile-fullscreen-active');
+    
+    // 2. Áp dụng styles triệt để
+    element.style.cssText = `
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100vh !important;
+        height: 100vw !important;
+        z-index: 99999 !important;
+        background: #000 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        border-radius: 0 !important;
+        transform: rotate(90deg) translateY(-100%) !important;
+        transform-origin: top left !important;
+        overflow: hidden !important;
+    `;
+    
+    // 3. Hide all other elements
+    document.querySelectorAll('body > *:not(#gamePlayer):not(.exit-game-btn)').forEach(el => {
+        el.style.display = 'none';
+    });
+}
+
+function blockBrowserUI() {
+    console.log('Blocking browser UI');
+    
+    // 1. Hide browser address bar (if possible)
+    window.scrollTo(0, 1);
+    
+    // 2. Add meta tag to hide browser UI
+    let meta = document.getElementById('fullscreen-meta');
+    if (!meta) {
+        meta = document.createElement('meta');
+        meta.id = 'fullscreen-meta';
+        meta.name = 'viewport';
+        document.head.appendChild(meta);
+    }
+    
+    // Viewport settings to hide browser UI
+    meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
+    
+    // 3. iOS specific - hide Safari UI
+    document.documentElement.style.webkitTouchCallout = 'none';
+    document.documentElement.style.webkitUserSelect = 'none';
+    document.documentElement.style.KhtmlUserSelect = 'none';
+    document.documentElement.style.MozUserSelect = 'none';
+    document.documentElement.style.msUserSelect = 'none';
+    document.documentElement.style.userSelect = 'none';
+    
+    // 4. Prevent pull-to-refresh
+    document.body.style.overscrollBehavior = 'none';
+}
+
+function preventZoomAndGestures() {
+    console.log('Preventing zoom and gestures');
+    
+    // Disable all gestures
+    document.addEventListener('touchstart', preventTouch, { passive: false });
+    document.addEventListener('touchmove', preventTouch, { passive: false });
+    document.addEventListener('touchend', preventTouch, { passive: false });
+    document.addEventListener('gesturestart', preventTouch, { passive: false });
+    document.addEventListener('gesturechange', preventTouch, { passive: false });
+    document.addEventListener('gestureend', preventTouch, { passive: false });
+    
+    // Disable double tap zoom
+    let lastTouchEnd = 0;
+    document.addEventListener('touchend', function(event) {
+        const now = (new Date()).getTime();
+        if (now - lastTouchEnd <= 300) {
+            event.preventDefault();
+        }
+        lastTouchEnd = now;
+    }, { passive: false });
+    
+    // Prevent pinch zoom
+    document.addEventListener('wheel', preventPinchZoom, { passive: false });
+}
+
+function preventTouch(e) {
+    if (e.touches.length > 1 || e.scale && e.scale !== 1) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+    }
+}
+
+function preventPinchZoom(e) {
+    if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        e.stopPropagation();
+        return false;
+    }
 }
 
 function applyMobileFullscreenStyles(element) {
@@ -1306,16 +1518,54 @@ function applyDesktopFullscreen(element) {
     console.log('Desktop fullscreen applied - scroll NOT locked');
 }
 
-function exitFullscreen() {
-    console.log('Exiting fullscreen');
+function exitMobileFullscreen() {
+    console.log('MOBILE: Exiting fullscreen');
     
-    if (isMobileDevice) {
-        exitMobileFullscreen();
-    } else {
-        exitDesktopFullscreen();
+    // 1. Unlock orientation
+    if (screen.orientation && screen.orientation.unlock) {
+        screen.orientation.unlock();
     }
     
-    isFullscreen = false;
+    // 2. Restore viewport
+    let meta = document.getElementById('fullscreen-meta');
+    if (meta) {
+        meta.content = 'width=device-width, initial-scale=1.0';
+    }
+    
+    // 3. Remove all event listeners
+    document.removeEventListener('touchstart', preventTouch);
+    document.removeEventListener('touchmove', preventTouch);
+    document.removeEventListener('touchend', preventTouch);
+    document.removeEventListener('gesturestart', preventTouch);
+    document.removeEventListener('gesturechange', preventTouch);
+    document.removeEventListener('gestureend', preventTouch);
+    document.removeEventListener('wheel', preventPinchZoom);
+    
+    // 4. Restore all elements
+    document.querySelectorAll('body > *').forEach(el => {
+        el.style.display = '';
+    });
+    
+    // 5. Remove classes and styles
+    const gamePlayer = document.getElementById('gamePlayer');
+    if (gamePlayer) {
+        gamePlayer.classList.remove('mobile-fullscreen');
+        gamePlayer.style.cssText = '';
+    }
+    
+    document.body.classList.remove('mobile-fullscreen-active');
+    
+    // 6. Restore scroll and selection
+    document.documentElement.style.webkitTouchCallout = '';
+    document.documentElement.style.webkitUserSelect = '';
+    document.documentElement.style.KhtmlUserSelect = '';
+    document.documentElement.style.MozUserSelect = '';
+    document.documentElement.style.msUserSelect = '';
+    document.documentElement.style.userSelect = '';
+    document.body.style.overscrollBehavior = '';
+    
+    // 7. Restore viewport position
+    window.scrollTo(0, 0);
 }
 
 function exitMobileFullscreen() {
@@ -1592,10 +1842,14 @@ function isValidEmail(email) {
     return emailRegex.test(email);
 }
 function resetAuthForm() {
-    document.getElementById('authUsername').value = '';
-    document.getElementById('authEmail').value = '';
-    document.getElementById('authPassword').value = '';
-    document.getElementById('authError').textContent = '';
+    // Chỉ reset khi không có lỗi
+    const errorElement = document.getElementById('authError');
+    if (errorElement && !errorElement.textContent.includes('successfully')) {
+        document.getElementById('authUsername').value = '';
+        document.getElementById('authEmail').value = '';
+        document.getElementById('authPassword').value = '';
+        errorElement.textContent = '';
+    }
     
     // Remove error classes
     document.querySelectorAll('.auth-form input').forEach(input => {
@@ -1738,4 +1992,123 @@ function checkScrollStatus() {
 // Có thể gọi sau khi exit game
 // checkScrollStatus();
 
+function debugUsers() {
+    const users = JSON.parse(localStorage.getItem('pickleball_users') || '[]');
+    console.log('=== DEBUG ALL USERS ===');
+    console.log('Total users:', users.length);
+    users.forEach((user, index) => {
+        console.log(`User ${index + 1}:`, {
+            username: user.username,
+            email: user.email,
+            passwordLength: user.password ? user.password.length : 'none',
+            createdAt: new Date(user.createdAt).toLocaleString(),
+            isAdmin: user.isAdmin || user.admin,
+            isBanned: user.isBanned || user.banned
+        });
+    });
+    console.log('=== END DEBUG ===');
+}
 
+// Có thể gọi từ console: debugUsers()
+function toggleAuthMode(event) {
+    if (event) {
+        event.preventDefault();
+        event.stopPropagation();
+    }
+    
+    const currentMode = document.getElementById('modalTitle').textContent.includes('Sign up') ? 'signup' : 'login';
+    const newMode = currentMode === 'login' ? 'signup' : 'login';
+    
+    // Đóng modal hiện tại
+    closeAuthModal();
+    
+    // Mở modal với mode mới sau delay
+    setTimeout(() => {
+        showAuthModal(newMode);
+    }, 300);
+    
+    return false;
+}
+// Hash function - SAME AS userSystem.js
+function simpleHash(password) {
+    let hash = 5381;
+    for (let i = 0; i < password.length; i++) {
+        hash = (hash * 33) ^ password.charCodeAt(i);
+    }
+    return (hash >>> 0).toString(36);
+}
+// Thêm vào cuối file main.js, sau tất cả các hàm
+function setupAuthFormEvents() {
+    // Thêm sự kiện Enter cho auth form
+    const authEmail = document.getElementById('authEmail');
+    const authPassword = document.getElementById('authPassword');
+    const authUsername = document.getElementById('authUsername');
+    
+    if (authEmail) {
+        authEmail.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                handleAuthSubmit();
+            }
+        });
+    }
+    
+    if (authPassword) {
+        authPassword.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                handleAuthSubmit();
+            }
+        });
+    }
+    
+    if (authUsername) {
+        authUsername.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                handleAuthSubmit();
+            }
+        });
+    }
+}
+
+// Gọi trong initializePage()
+function initializePage() {
+    console.log('🔄 Initializing page...');
+    
+    // Tạo admin account nếu chưa có
+    createAdminAccount();
+    
+    // Load session
+    loadSession();
+    
+    // Update UI based on login status
+    updateAuthUI();
+    
+    // Render comments ngay lập tức
+    renderComments();
+    
+    // Render updates
+    renderUpdates();
+    
+    // Setup event listeners
+    setupSmoothScroll();
+    setupFullscreenListener();
+    setupOrientationListeners();
+    setupFullscreenExitListeners();
+    setupAuthFormEvents(); // THÊM DÒNG NÀY
+    
+    console.log('✅ Page initialized');
+}
+// Thêm hàm kiểm tra fullscreen API
+function checkFullscreenSupport() {
+    const el = document.documentElement;
+    return (
+        el.requestFullscreen ||
+        el.mozRequestFullScreen ||
+        el.webkitRequestFullscreen ||
+        el.msRequestFullscreen
+    );
+}
+
+// Kiểm tra khi trang load
+if (isMobileDevice && !checkFullscreenSupport()) {
+    console.log('Fullscreen API not fully supported, using custom fullscreen');
+}

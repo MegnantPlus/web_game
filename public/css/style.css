@@ -2526,3 +2526,88 @@ body.mobile.game-fullscreen {
     width: 100% !important;
     height: 100% !important;
 }
+/* ===== MOBILE TRUE FULLSCREEN ===== */
+body.mobile-fullscreen-active {
+    overflow: hidden !important;
+    position: fixed !important;
+    width: 100% !important;
+    height: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #000 !important;
+    -webkit-touch-callout: none !important;
+    -webkit-user-select: none !important;
+    -khtml-user-select: none !important;
+    -moz-user-select: none !important;
+    -ms-user-select: none !important;
+    user-select: none !important;
+}
+
+.mobile-fullscreen {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vh !important;
+    height: 100vw !important;
+    z-index: 99999 !important;
+    background: #000 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    border-radius: 0 !important;
+    transform: rotate(90deg) translateY(-100%) !important;
+    transform-origin: top left !important;
+    overflow: hidden !important;
+}
+
+/* Hide all other elements during fullscreen */
+body.mobile-fullscreen-active > *:not(#gamePlayer):not(.exit-game-btn) {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+}
+
+/* Exit button for mobile fullscreen */
+.exit-game-btn.mobile {
+    position: fixed !important;
+    top: 15px !important;
+    right: 15px !important;
+    background: rgba(255, 71, 87, 0.95) !important;
+    color: white !important;
+    border: 2px solid white !important;
+    border-radius: 50% !important;
+    width: 50px !important;
+    height: 50px !important;
+    font-size: 1.8rem !important;
+    cursor: pointer !important;
+    z-index: 100000 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+    font-weight: bold;
+}
+
+/* Prevent iframe from stealing events */
+#gameFrame {
+    pointer-events: auto !important;
+}
+
+/* iOS specific fixes */
+@supports (-webkit-touch-callout: none) {
+    body.mobile-fullscreen-active {
+        height: -webkit-fill-available !important;
+    }
+    
+    .mobile-fullscreen {
+        height: 100vh !important;
+        width: 100vw !important;
+    }
+}
+
+/* Android Chrome specific fixes */
+@supports not (-webkit-touch-callout: none) {
+    body.mobile-fullscreen-active {
+        height: 100dvh !important;
+    }
+}
