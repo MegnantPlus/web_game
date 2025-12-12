@@ -11,6 +11,7 @@ let isShowingAllUpdates = false;
 let currentUpdateIndex = 0;
 let currentPreviewIndex = 0; // Thêm dòng này
 let isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+let isMobileFullscreenActive = false;
 
 // SIMPLE HASH FUNCTION - CHẠY CHÍNH XÁC
 // Thêm test function để debug
@@ -1065,26 +1066,25 @@ function filterUpdates() {
 // Game functions
 function startGame() {
     const placeholder = document.getElementById('gamePlaceholder');
-    const isMobile = isMobileDevice;
     
-    console.log('Starting game on:', isMobile ? 'Mobile' : 'Desktop');
+    console.log('🎮 Starting game on:', isMobileDevice ? 'Mobile' : 'Desktop');
     
     // Hiển thị loading
     placeholder.innerHTML = `
         <div class="placeholder-content">
             <h2 style="color: white; margin-bottom: 20px;">🎮 Game Loading...</h2>
             <p style="color: #aaa; margin-bottom: 30px;">
-                ${isMobile ? 'Game will start in fullscreen landscape mode' : 'Game will start in fullscreen mode'}
+                ${isMobileDevice ? 'Preparing immersive fullscreen mode' : 'Game will start in fullscreen mode'}
             </p>
             <div class="loading-spinner"></div>
         </div>
     `;
     
-    // Sau 1 giây load game
+    // Sau delay load game
     setTimeout(() => {
         placeholder.innerHTML = '';
         
-        // Tạo iframe để load game
+        // Tạo iframe game
         const iframe = document.createElement('iframe');
         iframe.id = 'gameFrame';
         iframe.src = 'Game/Game.html';
@@ -1096,54 +1096,61 @@ function startGame() {
             height: 100%;
             border: none;
             background: #000;
+            pointer-events: auto;
         `;
         
-        // Thêm iframe vào placeholder
+        // Thêm iframe
         placeholder.appendChild(iframe);
-        
-        // Nếu là mobile, dùng mobile fullscreen đặc biệt
-        if (isMobile) {
-            // Tự động vào fullscreen mobile
-            setTimeout(() => {
-                enterMobileFullscreen(document.getElementById('gamePlayer'));
-            }, 500);
-        } else {
-            // Desktop: fullscreen bình thường
-            if (!isFullscreen) {
-                toggleFullscreen();
-            }
-        }
         
         // Thêm nút exit
         const exitBtn = document.createElement('button');
-        exitBtn.className = 'exit-game-btn' + (isMobile ? ' mobile' : '');
+        exitBtn.className = 'exit-game-btn' + (isMobileDevice ? ' mobile' : '');
         exitBtn.innerHTML = '✕';
         exitBtn.title = 'Exit Game';
         exitBtn.onclick = exitGame;
+        exitBtn.style.cssText = isMobileDevice ? `
+            position: fixed !important;
+            top: 20px !important;
+            right: 20px !important;
+            background: rgba(255, 71, 87, 0.95) !important;
+            color: white !important;
+            border: 2px solid white !important;
+            border-radius: 50% !important;
+            width: 50px !important;
+            height: 50px !important;
+            font-size: 1.8rem !important;
+            cursor: pointer !important;
+            z-index: 1000000 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            font-weight: bold;
+        ` : '';
         
         document.getElementById('gamePlayer').appendChild(exitBtn);
+        
+        // Tự động fullscreen
+        setTimeout(() => {
+            if (!isFullscreen) {
+                toggleFullscreen();
+            }
+        }, 500);
         
     }, 1000);
 }
 
 function exitGame() {
-    console.log('Exiting game...');
+    console.log('🛑 Exiting game...');
     
-    // 1. Xóa iframe game
+    // 1. Xóa iframe
     const gameFrame = document.getElementById('gameFrame');
-    if (gameFrame) {
-        gameFrame.remove();
-        console.log('Game frame removed');
-    }
+    if (gameFrame) gameFrame.remove();
     
     // 2. Xóa nút exit
     const exitBtn = document.querySelector('.exit-game-btn');
-    if (exitBtn) {
-        exitBtn.remove();
-        console.log('Exit button removed');
-    }
+    if (exitBtn) exitBtn.remove();
     
-    // 3. Khôi phục placeholder về ban đầu
+    // 3. Khôi phục placeholder
     const placeholder = document.getElementById('gamePlaceholder');
     if (placeholder) {
         placeholder.innerHTML = `
@@ -1154,28 +1161,30 @@ function exitGame() {
                 <p>Click RUN GAME to start playing</p>
             </div>
         `;
-        console.log('Placeholder restored');
     }
     
-    // 4. THOÁT FULLSCREEN ĐÚNG CÁCH
+    // 4. Exit fullscreen
     if (isFullscreen) {
-        console.log('Exiting fullscreen...');
-        
-        // Đảm bảo mở khóa tất cả
-        restoreScrollAndOrientation();
-        
-        // Gọi hàm exitFullscreen
-        exitFullscreen();
-        
-        // Reset lại biến
+        if (isMobileDevice) {
+            exitMobileFullscreen();
+        } else {
+            exitDesktopFullscreen();
+        }
         isFullscreen = false;
     }
     
-    // 5. ĐẢM BẢO BODY CÓ THỂ SCROLL LẠI
-    restoreBodyScroll();
+    // 5. Force re-show all elements
+    if (isMobileDevice) {
+        setTimeout(() => {
+            document.querySelectorAll('body > *').forEach(el => {
+                el.style.display = '';
+                el.style.visibility = '';
+                el.style.opacity = '';
+            });
+        }, 100);
+    }
     
-    console.log('Game exited successfully');
-    showNotification('Game exited', 'info');
+    console.log('✅ Game exited');
 }
 
 function restoreBodyScroll() {
@@ -1236,11 +1245,19 @@ function toggleFullscreen() {
     const gamePlayer = document.getElementById('gamePlayer');
     
     if (!isFullscreen) {
-        // VÀO FULLSCREEN
-        enterFullscreen(gamePlayer);
+        if (isMobileDevice) {
+            enterMobileFullscreen(gamePlayer);
+        } else {
+            enterDesktopFullscreen(gamePlayer);
+        }
+        isFullscreen = true;
     } else {
-        // THOÁT FULLSCREEN
-        exitFullscreen();
+        if (isMobileDevice) {
+            exitMobileFullscreen();
+        } else {
+            exitDesktopFullscreen();
+        }
+        isFullscreen = false;
     }
 }
 
@@ -1257,33 +1274,38 @@ function enterFullscreen(element) {
 }
 
 function enterMobileFullscreen(element) {
-    console.log('MOBILE: Entering true fullscreen');
+    console.log('🚀 MOBILE: Entering immersive fullscreen');
     
-    // 1. Lock orientation to landscape
+    isMobileFullscreenActive = true;
+    
+    // 1. Áp dụng styles trước
+    applyMobileFullscreenStyles(element);
+    
+    // 2. Lock orientation to landscape
     if (screen.orientation && screen.orientation.lock) {
         screen.orientation.lock('landscape')
             .then(() => {
-                console.log('Screen locked to landscape');
-                applyTrueMobileFullscreen(element);
+                console.log('✅ Screen locked to landscape');
             })
             .catch(err => {
-                console.log('Failed to lock orientation:', err);
-                applyTrueMobileFullscreen(element);
+                console.log('❌ Failed to lock orientation:', err);
+                forceLandscape();
             });
     } else {
-        applyTrueMobileFullscreen(element);
+        forceLandscape();
     }
     
-    // 2. Block all browser UI
-    blockBrowserUI();
+    // 3. Hide browser UI
+    hideBrowserUI();
     
-    // 3. Prevent zoom and gestures
-    preventZoomAndGestures();
+    // 4. Prevent all unwanted gestures
+    preventAllGestures();
     
-    // 4. Apply mobile-specific styles
-    applyMobileFullscreenStyles(element);
+    // 5. Add overlay to trap focus
+    addFullscreenOverlay();
     
-    isFullscreen = true;
+    // 6. Request fullscreen if supported
+    requestFullscreenIfAvailable(element);
 }
 
 function applyTrueMobileFullscreen(element) {
@@ -1389,18 +1411,57 @@ function preventPinchZoom(e) {
 }
 
 function applyMobileFullscreenStyles(element) {
-    // Áp dụng styles cho mobile fullscreen
-    element.classList.add('fullscreen');
+    console.log('🎨 Applying mobile fullscreen styles');
+    
+    // Hide EVERYTHING except game
+    document.querySelectorAll('body > *').forEach(el => {
+        if (el.id !== 'gamePlayer' && !el.classList.contains('exit-game-btn')) {
+            el.style.display = 'none';
+            el.style.visibility = 'hidden';
+            el.style.opacity = '0';
+            el.style.pointerEvents = 'none';
+        }
+    });
+    
+    // Style game player for true fullscreen
     element.style.cssText = `
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100vw;
-        height: 100vh;
-        z-index: 9999;
-        background: #000;
-        transform: rotate(90deg);
-        transform-origin: center center;
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100vh !important;
+        height: 100vw !important;
+        z-index: 999999 !important;
+        background: #000 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: none !important;
+        border-radius: 0 !important;
+        transform: rotate(90deg) translateY(-100%) !important;
+        transform-origin: top left !important;
+        overflow: hidden !important;
+    `;
+    
+    // Style body
+    document.body.style.cssText = `
+        overflow: hidden !important;
+        position: fixed !important;
+        width: 100% !important;
+        height: 100% !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        background: #000 !important;
+        -webkit-touch-callout: none !important;
+        -webkit-user-select: none !important;
+        user-select: none !important;
+        touch-action: none !important;
+    `;
+    
+    // Style html
+    document.documentElement.style.cssText = `
+        overflow: hidden !important;
+        width: 100% !important;
+        height: 100% !important;
+        background: #000 !important;
     `;
 }
 
@@ -1519,75 +1580,92 @@ function applyDesktopFullscreen(element) {
 }
 
 function exitMobileFullscreen() {
-    console.log('MOBILE: Exiting fullscreen');
+    console.log('🚪 Exiting mobile fullscreen');
+    
+    if (!isMobileFullscreenActive) return;
+    
+    isMobileFullscreenActive = false;
     
     // 1. Unlock orientation
     if (screen.orientation && screen.orientation.unlock) {
         screen.orientation.unlock();
     }
     
-    // 2. Restore viewport
-    let meta = document.getElementById('fullscreen-meta');
+    // 2. Remove overlay
+    const overlay = document.getElementById('mobileFullscreenOverlay');
+    if (overlay) overlay.remove();
+    
+    // 3. Remove event listeners
+    if (window.fullscreenPreventFunction) {
+        const events = [
+            'touchstart', 'touchmove', 'touchend', 'touchcancel',
+            'gesturestart', 'gesturechange', 'gestureend',
+            'wheel', 'mousewheel', 'DOMMouseScroll'
+        ];
+        
+        events.forEach(event => {
+            document.removeEventListener(event, window.fullscreenPreventFunction, { 
+                capture: true 
+            });
+        });
+        
+        window.fullscreenPreventFunction = null;
+    }
+    
+    // 4. Restore all elements
+    document.querySelectorAll('body > *').forEach(el => {
+        el.style.cssText = '';
+        el.style.display = '';
+        el.style.visibility = '';
+        el.style.opacity = '';
+        el.style.pointerEvents = '';
+    });
+    
+    // 5. Restore game player
+    const gamePlayer = document.getElementById('gamePlayer');
+    if (gamePlayer) {
+        gamePlayer.style.cssText = '';
+        gamePlayer.classList.remove('fullscreen');
+    }
+    
+    // 6. Restore body and html
+    document.body.style.cssText = '';
+    document.documentElement.style.cssText = '';
+    document.body.classList.remove('mobile-fullscreen-forced');
+    
+    // 7. Restore viewport meta
+    const meta = document.querySelector('meta[name="viewport"]');
     if (meta) {
         meta.content = 'width=device-width, initial-scale=1.0';
     }
     
-    // 3. Remove all event listeners
-    document.removeEventListener('touchstart', preventTouch);
-    document.removeEventListener('touchmove', preventTouch);
-    document.removeEventListener('touchend', preventTouch);
-    document.removeEventListener('gesturestart', preventTouch);
-    document.removeEventListener('gesturechange', preventTouch);
-    document.removeEventListener('gestureend', preventTouch);
-    document.removeEventListener('wheel', preventPinchZoom);
-    
-    // 4. Restore all elements
-    document.querySelectorAll('body > *').forEach(el => {
-        el.style.display = '';
-    });
-    
-    // 5. Remove classes and styles
-    const gamePlayer = document.getElementById('gamePlayer');
-    if (gamePlayer) {
-        gamePlayer.classList.remove('mobile-fullscreen');
-        gamePlayer.style.cssText = '';
+    // 8. Exit native fullscreen if active
+    if (document.fullscreenElement || 
+        document.webkitFullscreenElement ||
+        document.mozFullScreenElement ||
+        document.msFullscreenElement) {
+        
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+        } else if (document.mozCancelFullScreen) {
+            document.mozCancelFullScreen();
+        } else if (document.msExitFullscreen) {
+            document.msExitFullscreen();
+        }
     }
     
-    document.body.classList.remove('mobile-fullscreen-active');
+    // 9. Force portrait orientation
+    if (screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock('portrait');
+    }
     
-    // 6. Restore scroll and selection
-    document.documentElement.style.webkitTouchCallout = '';
-    document.documentElement.style.webkitUserSelect = '';
-    document.documentElement.style.KhtmlUserSelect = '';
-    document.documentElement.style.MozUserSelect = '';
-    document.documentElement.style.msUserSelect = '';
-    document.documentElement.style.userSelect = '';
-    document.body.style.overscrollBehavior = '';
-    
-    // 7. Restore viewport position
+    // 10. Scroll to top
     window.scrollTo(0, 0);
+    
+    console.log('✅ Mobile fullscreen exited');
 }
-
-function exitMobileFullscreen() {
-    console.log('MOBILE: Exiting landscape');
-    
-    // 1. Unlock orientation
-    if (screen.orientation && screen.orientation.unlock) {
-        screen.orientation.unlock();
-    }
-    
-    // 2. Xóa styles
-    const gamePlayer = document.getElementById('gamePlayer');
-    if (gamePlayer) {
-        gamePlayer.classList.remove('fullscreen');
-        gamePlayer.style.cssText = '';
-    }
-    
-    // 3. Mở khóa scroll
-    document.body.style.overflow = 'auto';
-    document.documentElement.style.overflow = 'auto';
-}
-
 
 function exitDesktopFullscreen() {
     console.log('DESKTOP: Exiting fullscreen');
@@ -2111,4 +2189,243 @@ function checkFullscreenSupport() {
 // Kiểm tra khi trang load
 if (isMobileDevice && !checkFullscreenSupport()) {
     console.log('Fullscreen API not fully supported, using custom fullscreen');
+}
+function forceLandscape() {
+    console.log('🔄 Forcing landscape mode');
+    
+    // Force rotate using CSS
+    document.body.style.transform = 'rotate(90deg)';
+    document.body.style.transformOrigin = 'center';
+    document.body.style.width = '100vh';
+    document.body.style.height = '100vw';
+    document.body.style.position = 'fixed';
+    document.body.style.top = '50%';
+    document.body.style.left = '50%';
+    document.body.style.marginTop = '-50vw';
+    document.body.style.marginLeft = '-50vh';
+}
+function hideBrowserUI() {
+    console.log('👻 Hiding browser UI');
+    
+    // Scroll to hide address bar
+    window.scrollTo(0, 1);
+    
+    // Force scroll
+    setTimeout(() => {
+        window.scrollTo(0, 0);
+    }, 100);
+    
+    // Dynamic viewport meta
+    let meta = document.querySelector('meta[name="viewport"]');
+    if (meta) {
+        meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, shrink-to-fit=no';
+    } else {
+        meta = document.createElement('meta');
+        meta.name = 'viewport';
+        meta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, shrink-to-fit=no';
+        document.head.appendChild(meta);
+    }
+    
+    // iOS specific
+    document.documentElement.style.webkitTouchCallout = 'none';
+    document.documentElement.style.webkitUserSelect = 'none';
+    
+    // Prevent bounce/refresh
+    document.body.style.overscrollBehavior = 'none';
+    document.body.style.webkitOverflowScrolling = 'touch';
+}
+function preventAllGestures() {
+    console.log('🛑 Blocking all gestures');
+    
+    const preventDefault = function(e) {
+        if (e.touches && e.touches.length > 1) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }
+        
+        // Prevent zoom
+        if (e.ctrlKey || e.metaKey || e.scale && e.scale !== 1) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }
+        
+        // Prevent pull to refresh
+        if (e.type === 'touchmove' && e.touches.length === 1) {
+            const touch = e.touches[0];
+            if (touch.clientY > touch.screenY) {
+                e.preventDefault();
+                return false;
+            }
+        }
+    };
+    
+    // Add all event listeners
+    const events = [
+        'touchstart', 'touchmove', 'touchend', 'touchcancel',
+        'gesturestart', 'gesturechange', 'gestureend',
+        'wheel', 'mousewheel', 'DOMMouseScroll'
+    ];
+    
+    events.forEach(event => {
+        document.addEventListener(event, preventDefault, { 
+            passive: false,
+            capture: true 
+        });
+    });
+    
+    // Store for cleanup
+    window.fullscreenPreventFunction = preventDefault;
+}
+function addFullscreenOverlay() {
+    console.log('🛡️ Adding fullscreen overlay');
+    
+    // Remove existing overlay
+    const existingOverlay = document.getElementById('mobileFullscreenOverlay');
+    if (existingOverlay) {
+        existingOverlay.remove();
+    }
+    
+    // Create new overlay
+    const overlay = document.createElement('div');
+    overlay.id = 'mobileFullscreenOverlay';
+    overlay.style.cssText = `
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        background: #000 !important;
+        z-index: 999998 !important;
+        pointer-events: none !important;
+    `;
+    
+    document.body.appendChild(overlay);
+}
+function requestFullscreenIfAvailable(element) {
+    // Try native fullscreen first
+    if (element.requestFullscreen) {
+        element.requestFullscreen().catch(err => {
+            console.log('Native fullscreen failed:', err);
+            useCustomFullscreen();
+        });
+    } else if (element.webkitRequestFullscreen) {
+        element.webkitRequestFullscreen().catch(err => {
+            console.log('Webkit fullscreen failed:', err);
+            useCustomFullscreen();
+        });
+    } else if (element.mozRequestFullScreen) {
+        element.mozRequestFullScreen().catch(err => {
+            console.log('Moz fullscreen failed:', err);
+            useCustomFullscreen();
+        });
+    } else {
+        useCustomFullscreen();
+    }
+}   
+function useCustomFullscreen() {
+    console.log('📱 Using custom fullscreen implementation');
+    
+    // Add special class for CSS targeting
+    document.body.classList.add('mobile-fullscreen-forced');
+    
+    // Force hide all UI elements
+    const hideSelectors = [
+        'header', 'nav', 'footer', '.header', '.title',
+        '.auth-section', '.comments-section', '.updates-section',
+        '#introduction', '#donate'
+    ];
+    
+    hideSelectors.forEach(selector => {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach(el => {
+            el.style.cssText = `
+                display: none !important;
+                visibility: hidden !important;
+                opacity: 0 !important;
+                pointer-events: none !important;
+                position: absolute !important;
+                left: -9999px !important;
+            `;
+        });
+    });
+}
+// Thêm vào cuối main.js
+function detectAndFixMobileIssues() {
+    if (!isMobileDevice) return;
+    
+    console.log('📱 Detecting mobile browser...');
+    
+    // Detect iOS Safari
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    
+    if (isIOS && isSafari) {
+        console.log('🍎 iOS Safari detected - applying special fixes');
+        applyIOSFixes();
+    }
+    
+    // Detect Chrome on Android
+    const isAndroidChrome = /Android.*Chrome/.test(navigator.userAgent);
+    if (isAndroidChrome) {
+        console.log('🤖 Android Chrome detected');
+        applyAndroidChromeFixes();
+    }
+}
+
+function applyIOSFixes() {
+    // Force standalone mode
+    if (window.navigator.standalone === true) {
+        console.log('📱 Running in standalone mode (PWA)');
+    } else {
+        console.log('⚠️ Not in standalone mode - UI may be visible');
+        
+        // Add prompt to add to home screen
+        if ('standalone' in window.navigator) {
+            setTimeout(() => {
+                showNotification('For best experience, add to Home Screen!', 'info');
+            }, 3000);
+        }
+    }
+}
+
+function applyAndroidChromeFixes() {
+    // Android Chrome specific fixes
+    document.addEventListener('visibilitychange', function() {
+        if (document.hidden && isMobileFullscreenActive) {
+            console.log('📱 App hidden, exiting fullscreen');
+            exitMobileFullscreen();
+        }
+    });
+}
+
+// Gọi trong initializePage
+function initializePage() {
+    console.log('🔄 Initializing page...');
+    
+    // Tạo admin account
+    createAdminAccount();
+    
+    // Load session
+    loadSession();
+    
+    // Update UI
+    updateAuthUI();
+    
+    // Render content
+    renderComments();
+    renderUpdates();
+    
+    // Setup event listeners
+    setupSmoothScroll();
+    setupFullscreenListener();
+    setupOrientationListeners();
+    setupFullscreenExitListeners();
+    setupAuthFormEvents();
+    
+    // Mobile detection and fixes
+    detectAndFixMobileIssues();
+    
+    console.log('✅ Page initialized');
 }
