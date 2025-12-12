@@ -10,6 +10,7 @@ let currentUser = null;
 let isShowingAllUpdates = false;
 let currentUpdateIndex = 0;
 let currentPreviewIndex = 0; // Thêm dòng này
+let isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
 // SIMPLE HASH FUNCTION - CHẠY CHÍNH XÁC
 function simpleHash(password) {
@@ -44,6 +45,17 @@ function createAdminAccount() {
 function initializePage() {
     console.log('🔄 Initializing page...');
     
+    // Detect device type
+    if (isMobileDevice) {
+        document.body.classList.add('mobile');
+        document.body.classList.remove('desktop');
+        console.log('📱 Mobile device detected');
+    } else {
+        document.body.classList.add('desktop');
+        document.body.classList.remove('mobile');
+        console.log('💻 Desktop device detected');
+    }
+    
     // Tạo admin account nếu chưa có
     createAdminAccount();
     
@@ -62,6 +74,8 @@ function initializePage() {
     // Setup event listeners
     setupSmoothScroll();
     setupFullscreenListener();
+    setupOrientationListeners();
+    setupFullscreenExitListeners();
     
     console.log('✅ Page initialized');
 }
@@ -954,12 +968,17 @@ function filterUpdates() {
 // Game functions
 function startGame() {
     const placeholder = document.getElementById('gamePlaceholder');
+    const isMobile = isMobileDevice;
+    
+    console.log('Starting game on:', isMobile ? 'Mobile' : 'Desktop');
     
     // Hiển thị loading
     placeholder.innerHTML = `
         <div class="placeholder-content">
             <h2 style="color: white; margin-bottom: 20px;">🎮 Game Loading...</h2>
-            <p style="color: #aaa; margin-bottom: 30px;">Game will start in fullscreen mode</p>
+            <p style="color: #aaa; margin-bottom: 30px;">
+                ${isMobile ? 'Game will start in landscape mode' : 'Game will start in fullscreen mode'}
+            </p>
             <div class="loading-spinner"></div>
         </div>
     `;
@@ -1121,39 +1140,65 @@ function toggleFullscreen() {
 }
 
 function enterFullscreen(element) {
-    // Kiểm tra nếu là mobile
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    console.log('Entering fullscreen, device:', isMobileDevice ? 'Mobile' : 'Desktop');
     
-    if (isMobile) {
-        // Trên mobile: dùng Screen Orientation API
-        if (screen.orientation && screen.orientation.lock) {
-            // Khóa màn hình ngang
-            screen.orientation.lock('landscape')
-                .then(() => {
-                    console.log('Screen locked to landscape');
-                    applyMobileFullscreen(element);
-                })
-                .catch(err => {
-                    console.log('Failed to lock orientation:', err);
-                    applyMobileFullscreen(element);
-                });
-        } else {
-            // Fallback nếu API không hỗ trợ
-            applyMobileFullscreen(element);
-        }
+    if (isMobileDevice) {
+        // CHỈ MOBILE: Xoay ngang
+        enterMobileFullscreen(element);
     } else {
-        // Trên desktop: dùng Fullscreen API thông thường
-        applyDesktopFullscreen(element);
+        // DESKTOP: Fullscreen bình thường
+        enterDesktopFullscreen(element);
     }
 }
 
+function enterMobileFullscreen(element) {
+    console.log('MOBILE: Rotating to landscape');
+    
+    // 1. Lock orientation thành landscape
+    if (screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock('landscape')
+            .then(() => {
+                console.log('Screen locked to landscape');
+                applyMobileFullscreenStyles(element);
+            })
+            .catch(err => {
+                console.log('Failed to lock orientation:', err);
+                applyMobileFullscreenStyles(element);
+            });
+    } else {
+        applyMobileFullscreenStyles(element);
+    }
+    
+    // 2. Khóa scroll cho mobile
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    
+    isFullscreen = true;
+}
+
+function applyMobileFullscreenStyles(element) {
+    // Áp dụng styles cho mobile fullscreen
+    element.classList.add('fullscreen');
+    element.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        z-index: 9999;
+        background: #000;
+        transform: rotate(90deg);
+        transform-origin: center center;
+    `;
+}
+
 function applyMobileFullscreen(element) {
-    // Áp dụng style fullscreen cho mobile
     console.log('Applying mobile fullscreen');
     
-    // Thêm class để khóa scroll body
-    document.body.classList.add('game-fullscreen');
+    // 1. Thêm class để style
     element.classList.add('fullscreen');
+    
+    // 2. Apply mobile fullscreen styles
     element.style.position = 'fixed';
     element.style.top = '0';
     element.style.left = '0';
@@ -1162,55 +1207,49 @@ function applyMobileFullscreen(element) {
     element.style.zIndex = '9999';
     element.style.margin = '0';
     element.style.borderRadius = '0';
+    element.style.transform = 'rotate(90deg)';
+    element.style.transformOrigin = 'center center';
     
-    // Tính toán scale để vừa với màn hình
-    const viewportWidth = window.innerWidth;
-    const viewportHeight = window.innerHeight;
-    const gameAspectRatio = 16 / 9; // Tỷ lệ game (có thể điều chỉnh)
-    
-    let scale, translateX, translateY;
-    
-    if (viewportWidth / viewportHeight > gameAspectRatio) {
-        // Màn hình rộng hơn game
-        scale = viewportHeight / (viewportWidth / gameAspectRatio);
-        translateX = (viewportWidth - (viewportWidth * scale)) / 2;
-        translateY = 0;
-    } else {
-        // Màn hình cao hơn game
-        scale = viewportWidth / (viewportHeight * gameAspectRatio);
-        translateX = 0;
-        translateY = (viewportHeight - (viewportHeight * scale)) / 2;
+    // 3. Khóa orientation cho mobile
+    if (screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock('landscape')
+            .then(() => {
+                console.log('Screen locked to landscape');
+            })
+            .catch(err => {
+                console.log('Failed to lock orientation:', err);
+            });
     }
     
-    // Áp dụng transform để căn giữa và scale
-    element.style.transform = `translate(${translateX}px, ${translateY}px) scale(${scale})`;
-    element.style.transformOrigin = 'top left';
-    
-    // Ẩn các phần tử khác
+    // 4. Chỉ khóa scroll cho mobile
     document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
     
-    // Thêm overlay để tránh touch ra ngoài
-    if (!document.getElementById('fullscreenOverlay')) {
+    // 5. Thêm overlay để ngăn touch ra ngoài
+    if (!document.getElementById('mobileFullscreenOverlay')) {
         const overlay = document.createElement('div');
-        overlay.id = 'fullscreenOverlay';
+        overlay.id = 'mobileFullscreenOverlay';
         overlay.style.cssText = `
             position: fixed;
             top: 0;
             left: 0;
-            width: 100vw;
-            height: 100vh;
-            background: black;
+            width: 100%;
+            height: 100%;
+            background: #000;
             z-index: 9998;
-            display: none;
+            display: block;
         `;
         document.body.appendChild(overlay);
     }
     
     isFullscreen = true;
+    console.log('Mobile fullscreen applied');
 }
 
-function applyDesktopFullscreen(element) {
-    // Fullscreen cho desktop
+function enterDesktopFullscreen(element) {
+    console.log('DESKTOP: Standard fullscreen');
+    
+    // 1. Sử dụng Fullscreen API
     if (element.requestFullscreen) {
         element.requestFullscreen();
     } else if (element.mozRequestFullScreen) {
@@ -1221,67 +1260,108 @@ function applyDesktopFullscreen(element) {
         element.msRequestFullscreen();
     }
     
+    // 2. Thêm class nhưng KHÔNG khóa scroll
+    element.classList.add('fullscreen');
+    
+    // 3. KHÔNG áp dụng transform (không xoay)
+    element.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100vw;
+        height: 100vh;
+        z-index: 9999;
+        background: #000;
+    `;
+    
+    // 4. QUAN TRỌNG: KHÔNG khóa scroll trên desktop
+    // document.body.style.overflow = 'auto'; // GIỮ NGUYÊN
+    
     isFullscreen = true;
 }
 
-function exitFullscreen() {
-    console.log('exitFullscreen called');
+function applyDesktopFullscreen(element) {
+    console.log('Applying desktop fullscreen');
     
-    const gamePlayer = document.getElementById('gamePlayer');
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    
-    if (isMobile) {
-        console.log('Mobile exit fullscreen');
-        // Trên mobile: mở khóa orientation
-        if (screen.orientation && screen.orientation.unlock) {
-            try {
-                screen.orientation.unlock();
-                console.log('Screen orientation unlocked');
-            } catch (err) {
-                console.log('Failed to unlock orientation:', err);
-            }
-        }
-        
-        // Xóa style fullscreen
-        if (gamePlayer) {
-            gamePlayer.classList.remove('fullscreen');
-            gamePlayer.style.cssText = '';
-            console.log('Game player styles cleared');
-        }
-        
-        // Đảm bảo scroll được khôi phục
-        restoreBodyScroll();
-        
-        // Xóa overlay
-        const overlay = document.getElementById('fullscreenOverlay');
-        if (overlay) {
-            overlay.remove();
-            console.log('Fullscreen overlay removed');
-        }
-        
-    } else {
-        console.log('Desktop exit fullscreen');
-        // Trên desktop: thoát fullscreen API
-        if (document.exitFullscreen) {
-            document.exitFullscreen();
-        } else if (document.mozCancelFullScreen) {
-            document.mozCancelFullScreen();
-        } else if (document.webkitExitFullscreen) {
-            document.webkitExitFullscreen();
-        } else if (document.msExitFullscreen) {
-            document.msExitFullscreen();
-        }
-        
-        if (gamePlayer) {
-            gamePlayer.classList.remove('fullscreen');
-            console.log('Fullscreen class removed');
-        }
+    // 1. Sử dụng Fullscreen API của browser
+    if (element.requestFullscreen) {
+        element.requestFullscreen();
+    } else if (element.mozRequestFullScreen) {
+        element.mozRequestFullScreen();
+    } else if (element.webkitRequestFullscreen) {
+        element.webkitRequestFullscreen();
+    } else if (element.msRequestFullscreen) {
+        element.msRequestFullscreen();
     }
     
-    // Luôn restore body scroll
-    restoreBodyScroll();
+    // 2. KHÔNG khóa body scroll trên desktop
+    // Chỉ thêm class để style
+    element.classList.add('fullscreen');
     
-    console.log('Fullscreen exit complete');
+    // 3. Đảm bảo game player có đúng kích thước
+    element.style.width = '100%';
+    element.style.height = '100%';
+    
+    isFullscreen = true;
+    console.log('Desktop fullscreen applied - scroll NOT locked');
+}
+
+function exitFullscreen() {
+    console.log('Exiting fullscreen');
+    
+    if (isMobileDevice) {
+        exitMobileFullscreen();
+    } else {
+        exitDesktopFullscreen();
+    }
+    
+    isFullscreen = false;
+}
+
+function exitMobileFullscreen() {
+    console.log('MOBILE: Exiting landscape');
+    
+    // 1. Unlock orientation
+    if (screen.orientation && screen.orientation.unlock) {
+        screen.orientation.unlock();
+    }
+    
+    // 2. Xóa styles
+    const gamePlayer = document.getElementById('gamePlayer');
+    if (gamePlayer) {
+        gamePlayer.classList.remove('fullscreen');
+        gamePlayer.style.cssText = '';
+    }
+    
+    // 3. Mở khóa scroll
+    document.body.style.overflow = 'auto';
+    document.documentElement.style.overflow = 'auto';
+}
+
+
+function exitDesktopFullscreen() {
+    console.log('DESKTOP: Exiting fullscreen');
+    
+    // 1. Exit fullscreen API
+    if (document.exitFullscreen) {
+        document.exitFullscreen();
+    } else if (document.mozCancelFullScreen) {
+        document.mozCancelFullScreen();
+    } else if (document.webkitExitFullscreen) {
+        document.webkitExitFullscreen();
+    } else if (document.msExitFullscreen) {
+        document.msExitFullscreen();
+    }
+    
+    // 2. Xóa class và styles
+    const gamePlayer = document.getElementById('gamePlayer');
+    if (gamePlayer) {
+        gamePlayer.classList.remove('fullscreen');
+        gamePlayer.style.cssText = '';
+    }
+    
+    // 3. Đảm bảo scroll hoạt động
+    document.body.style.overflow = 'auto';
 }
 
 function setupFullscreenListener() {
@@ -1292,23 +1372,24 @@ function setupFullscreenListener() {
 }
 
 function updateFullscreenState() {
-    const gamePlayer = document.getElementById('gamePlayer');
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    
-    if (!isMobile) {
-        // Desktop: kiểm tra fullscreen API
+    // Chỉ xử lý cho desktop (vì mobile tự quản lý)
+    if (!isMobileDevice) {
         if (!document.fullscreenElement &&
             !document.webkitFullscreenElement &&
             !document.mozFullScreenElement &&
             !document.msFullscreenElement) {
+            // Desktop đã thoát fullscreen
             isFullscreen = false;
-            gamePlayer.classList.remove('fullscreen');
-            gamePlayer.style.cssText = '';
+            const gamePlayer = document.getElementById('gamePlayer');
+            if (gamePlayer) {
+                gamePlayer.classList.remove('fullscreen');
+            }
+            console.log('Desktop fullscreen state: exited');
         } else {
             isFullscreen = true;
+            console.log('Desktop fullscreen state: entered');
         }
     }
-    // Mobile: giữ nguyên trạng thái vì chúng ta tự quản lý
 }
 
 // Donate function
@@ -1523,9 +1604,18 @@ function resetAuthForm() {
 }
 // Thêm vào main.js
 function setupOrientationListeners() {
-    // Lắng nghe sự kiện xoay màn hình
-    window.addEventListener('orientationchange', handleOrientationChange);
-    window.addEventListener('resize', handleResize);
+    // CHỈ áp dụng cho mobile
+    if (!isMobileDevice) return;
+    
+    window.addEventListener('orientationchange', function() {
+        if (isFullscreen) {
+            const gamePlayer = document.getElementById('gamePlayer');
+            setTimeout(() => {
+                // Re-apply styles khi orientation thay đổi
+                applyMobileFullscreenStyles(gamePlayer);
+            }, 300);
+        }
+    });
 }
 
 function handleOrientationChange() {
@@ -1647,4 +1737,5 @@ function checkScrollStatus() {
 
 // Có thể gọi sau khi exit game
 // checkScrollStatus();
+
 
