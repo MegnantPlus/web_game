@@ -2,23 +2,11 @@
 <html lang="vi">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="theme-color" content="#000000">
-    <meta name="apple-mobile-web-app-title" content="Pickleball">
-    <link rel="apple-touch-icon" href="img/ab1152a0f1cc7e9227dd.jpg">
-
-    <!-- iOS Safari specific -->
-    <meta name="format-detection" content="telephone=no">
-    <meta name="apple-touch-fullscreen" content="yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pickleball Champions</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <!-- Thêm vào phần head, sau viewport meta -->
-
     <style>
         .spacing { height: 50px; }
         .big-spacing { height: 80px; }
@@ -180,14 +168,6 @@
             cursor: pointer;
         }
     </style>
-    <script>
-        // Polyfill cho Screen Orientation API
-        if (!screen.orientation && screen.mozOrientation) {
-            screen.orientation = screen.mozOrientation;
-        } else if (!screen.orientation && screen.msOrientation) {
-            screen.orientation = screen.msOrientation;
-        }
-    </script>
 </head>
 
 <body onload="document.body.classList.add('loaded')" class="loading">
@@ -336,8 +316,7 @@
             <button id="authSubmitBtn" onclick="handleAuthSubmit()">Log in</button>
             
             <p class="auth-switch" id="authSwitch">
-                Don't have an account? 
-            <a href="javascript:void(0)" onclick="toggleAuthMode(event)">Sign up</a>
+                Don't have an account? <a href="#" onclick="toggleAuthMode()">Sign up</a>
             </p>
             <p class="auth-error" id="authError"></p>
         </div>
@@ -469,8 +448,8 @@
             <div class="comment-form" id="commentForm">
                 <div class="login-to-comment" id="loginToComment">
                     <p>
-                         <a href="javascript:void(0)" onclick="showAuthModal('login', event)"
-                            style="color: #2196F3; text-decoration: underline; cursor: pointer;">
+                        <a href="#" onclick="showAuthModal('login')"
+                            style="color: #2196F3; text-decoration: underline;">
                             Please login or sign up to comment
                         </a>
                     </p>

@@ -14,10 +14,6 @@ function validateInput(text, minLength, maxLength, fieldName) {
 }
 // ===== UPDATE FORM MODAL =====
 function showUpdateForm() {
-    // Ẩn nút exit và fullscreen
-    if (typeof hideExitButton === 'function') hideExitButton();
-    if (typeof hideFullscreenButton === 'function') hideFullscreenButton();
-    
     const modal = document.createElement('div');
     modal.className = 'custom-modal-overlay';
     modal.id = 'updateFormModal';
@@ -95,17 +91,7 @@ function closeUpdateForm() {
     const modal = document.getElementById('updateFormModal');
     if (modal) {
         modal.style.animation = 'modalFadeOut 0.3s ease forwards';
-        setTimeout(() => {
-            modal.remove();
-            // Hiện lại nút exit nếu đang fullscreen
-            if (isFullscreen && typeof showExitButton === 'function') {
-                showExitButton();
-            }
-            // Hiện lại nút fullscreen nếu không fullscreen
-            if (!isFullscreen && typeof showFullscreenButton === 'function') {
-                showFullscreenButton();
-            }
-        }, 300);
+        setTimeout(() => modal.remove(), 300);
     }
 }
 
@@ -175,19 +161,7 @@ function closeCustomModal(modalId) {
     const modal = document.getElementById(modalId);
     if (modal) {
         modal.style.animation = 'modalFadeOut 0.3s ease forwards';
-        setTimeout(() => {
-            if (modal.parentElement) {
-                modal.remove();
-                // Hiện lại nút exit nếu đang fullscreen
-                if (isFullscreen && typeof showExitButton === 'function') {
-                    showExitButton();
-                }
-                // Hiện lại nút fullscreen nếu không fullscreen
-                if (!isFullscreen && typeof showFullscreenButton === 'function') {
-                    showFullscreenButton();
-                }
-            }
-        }, 300);
+        setTimeout(() => modal.remove(), 300);
     }
 }
 
