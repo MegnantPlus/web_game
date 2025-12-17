@@ -2180,10 +2180,7 @@ function applyCSSRotation() {
     }
 }
 
-
-
 function hideBrowserUI() {
-    // Giữ nguyên hàm của bạn
     console.log('👻 Hiding browser UI');
     
     // Scroll to hide address bar
@@ -2486,4 +2483,3 @@ function showRotationMessage() {
         message.style.display = 'none';
     }, 3000);
 }
-// Thêm
