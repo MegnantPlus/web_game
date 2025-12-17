@@ -1084,7 +1084,7 @@ function startGame() {
     setTimeout(() => {
         placeholder.innerHTML = '';
         
-        // Tạo iframe game
+        // Tạo iframe game - GIỮ NGUYÊN NHƯ CŨ
         const iframe = document.createElement('iframe');
         iframe.id = 'gameFrame';
         iframe.src = 'Game/Game.html';
@@ -1108,24 +1108,6 @@ function startGame() {
         exitBtn.innerHTML = '✕';
         exitBtn.title = 'Exit Game';
         exitBtn.onclick = exitGame;
-        exitBtn.style.cssText = isMobileDevice ? `
-            position: fixed !important;
-            top: 20px !important;
-            right: 20px !important;
-            background: rgba(255, 71, 87, 0.95) !important;
-            color: white !important;
-            border: 2px solid white !important;
-            border-radius: 50% !important;
-            width: 50px !important;
-            height: 50px !important;
-            font-size: 1.8rem !important;
-            cursor: pointer !important;
-            z-index: 1000000 !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            font-weight: bold;
-        ` : '';
         
         document.getElementById('gamePlayer').appendChild(exitBtn);
         
@@ -1413,17 +1395,16 @@ function preventPinchZoom(e) {
 function applyMobileFullscreenStyles(element) {
     console.log('🎨 Applying mobile fullscreen styles');
     
-    // Hide EVERYTHING except game
-    document.querySelectorAll('body > *').forEach(el => {
-        if (el.id !== 'gamePlayer' && !el.classList.contains('exit-game-btn')) {
-            el.style.display = 'none';
-            el.style.visibility = 'hidden';
-            el.style.opacity = '0';
-            el.style.pointerEvents = 'none';
-        }
-    });
+    // 1. Hide browser address bar
+    window.scrollTo(0, 1);
     
-    // Style game player for true fullscreen
+    // 2. Apply styles to body
+    document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.width = '100%';
+    document.body.style.height = '100%';
+    
+    // 3. Apply styles to game player
     element.style.cssText = `
         position: fixed !important;
         top: 0 !important;
@@ -1441,28 +1422,21 @@ function applyMobileFullscreenStyles(element) {
         overflow: hidden !important;
     `;
     
-    // Style body
-    document.body.style.cssText = `
-        overflow: hidden !important;
-        position: fixed !important;
-        width: 100% !important;
-        height: 100% !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        background: #000 !important;
-        -webkit-touch-callout: none !important;
-        -webkit-user-select: none !important;
-        user-select: none !important;
-        touch-action: none !important;
-    `;
-    
-    // Style html
-    document.documentElement.style.cssText = `
-        overflow: hidden !important;
-        width: 100% !important;
-        height: 100% !important;
-        background: #000 !important;
-    `;
+    // 4. Fix iframe rotation
+    const gameFrame = document.getElementById('gameFrame');
+    if (gameFrame) {
+        gameFrame.style.cssText = `
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vh !important;
+            height: 100vw !important;
+            border: none !important;
+            background: #000 !important;
+            transform: rotate(-90deg) translateX(-100%) !important;
+            transform-origin: top left !important;
+        `;
+    }
 }
 
 function applyMobileFullscreen(element) {
@@ -2428,4 +2402,23 @@ function initializePage() {
     detectAndFixMobileIssues();
     
     console.log('✅ Page initialized');
+}
+function hideExitButton() {
+    const exitBtn = document.querySelector('.exit-game-btn');
+    if (exitBtn) {
+        exitBtn.style.display = 'none';
+        exitBtn.style.visibility = 'hidden';
+        exitBtn.style.opacity = '0';
+        exitBtn.style.pointerEvents = 'none';
+    }
+}
+
+function showExitButton() {
+    const exitBtn = document.querySelector('.exit-game-btn');
+    if (exitBtn && isFullscreen) {
+        exitBtn.style.display = 'flex';
+        exitBtn.style.visibility = 'visible';
+        exitBtn.style.opacity = '1';
+        exitBtn.style.pointerEvents = 'auto';
+    }
 }

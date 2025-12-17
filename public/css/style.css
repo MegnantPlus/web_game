@@ -2722,3 +2722,51 @@ body.mobile-fullscreen-forced > *:not(#gamePlayer):not(.exit-game-btn) {
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.7) !important;
     text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5) !important;
 }
+/* ===== FIX EXIT BUTTON Z-INDEX ===== */
+.exit-game-btn {
+    position: absolute !important;
+    top: 15px !important;
+    right: 15px !important;
+    background: rgba(255, 71, 87, 0.9) !important;
+    color: white !important;
+    border: none !important;
+    border-radius: 50% !important;
+    width: 40px !important;
+    height: 40px !important;
+    font-size: 1.5rem !important;
+    cursor: pointer !important;
+    z-index: 1001 !important; /* Chỉ cao hơn game player */
+    transition: all 0.2s ease;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
+}
+
+/* Ẩn nút exit khi có modal */
+.auth-modal ~ .exit-game-btn,
+.admin-modal ~ .exit-game-btn,
+.custom-modal-overlay ~ .exit-game-btn {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+}
+
+/* Modal phải có z-index cao hơn */
+.auth-modal {
+    z-index: 2000 !important;
+}
+
+.admin-modal {
+    z-index: 2001 !important;
+}
+
+.custom-modal-overlay {
+    z-index: 9999 !important;
+}
+
+/* Đảm bảo game player có z-index thấp hơn */
+.game-player.fullscreen {
+    z-index: 1000 !important;
+}
