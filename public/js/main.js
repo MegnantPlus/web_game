@@ -57,6 +57,14 @@ function initializePage() {
     // Setup event listeners
     setupSmoothScroll();
     setupFullscreenListener();
+    setupOrientationListener(); // Thêm dòng này
+    
+    // Thêm listener để khôi phục scroll khi load lại trang
+    window.addEventListener('load', function() {
+        if (!isFullscreen) {
+            enableScroll();
+        }
+    });
     
     console.log('✅ Page initialized');
 }
@@ -1049,6 +1057,7 @@ function exitGame() {
 // Fullscreen functions
 function toggleFullscreen() {
     const gamePlayer = document.getElementById('gamePlayer');
+    const header = document.querySelector('.header');
     
     if (!isFullscreen) {
         // Lưu vị trí scroll trước khi vào fullscreen
@@ -1056,6 +1065,15 @@ function toggleFullscreen() {
         
         // Chặn scroll
         disableScroll();
+        
+        // Ẩn header nếu ở landscape
+        if (window.innerWidth < 768 && window.matchMedia("(orientation: landscape)").matches) {
+            if (header) {
+                header.style.display = 'none';
+                header.style.opacity = '0';
+                header.style.visibility = 'hidden';
+            }
+        }
         
         if (gamePlayer.requestFullscreen) {
             gamePlayer.requestFullscreen();
@@ -1074,6 +1092,13 @@ function toggleFullscreen() {
     } else {
         // Mở lại scroll
         enableScroll();
+        
+        // Hiện lại header
+        if (header) {
+            header.style.display = '';
+            header.style.opacity = '';
+            header.style.visibility = '';
+        }
         
         if (document.exitFullscreen) {
             document.exitFullscreen();
@@ -1094,6 +1119,7 @@ function toggleFullscreen() {
     isFullscreen = !isFullscreen;
 }
 
+
 function setupFullscreenListener() {
     document.addEventListener('fullscreenchange', updateFullscreenState);
     document.addEventListener('webkitfullscreenchange', updateFullscreenState);
@@ -1109,6 +1135,8 @@ function setupFullscreenListener() {
 }
 
 function updateFullscreenState() {
+    const header = document.querySelector('.header');
+    
     if (!document.fullscreenElement &&
         !document.webkitFullscreenElement &&
         !document.mozFullScreenElement &&
@@ -1116,6 +1144,13 @@ function updateFullscreenState() {
         // Đã thoát fullscreen
         isFullscreen = false;
         document.getElementById('gamePlayer').classList.remove('fullscreen');
+        
+        // Hiện lại header
+        if (header) {
+            header.style.display = '';
+            header.style.opacity = '';
+            header.style.visibility = '';
+        }
         
         // Mở lại scroll
         enableScroll();
@@ -1127,6 +1162,16 @@ function updateFullscreenState() {
     } else {
         // Đã vào fullscreen
         isFullscreen = true;
+        
+        // Ẩn header nếu ở landscape trên mobile
+        if (window.innerWidth < 768 && window.matchMedia("(orientation: landscape)").matches) {
+            if (header) {
+                header.style.display = 'none';
+                header.style.opacity = '0';
+                header.style.visibility = 'hidden';
+            }
+        }
+        
         if (window.innerWidth < 768) {
             document.getElementById('gamePlayer').classList.add('fullscreen');
         }
@@ -1136,6 +1181,33 @@ function updateFullscreenState() {
         disableScroll();
     }
 }
+
+function setupOrientationListener() {
+    // Kiểm tra khi xoay màn hình
+    window.addEventListener('orientationchange', function() {
+        const header = document.querySelector('.header');
+        
+        if (isFullscreen) {
+            // Nếu đang fullscreen và xoay ngang
+            if (window.matchMedia("(orientation: landscape)").matches) {
+                // Ẩn header
+                if (header) {
+                    header.style.display = 'none';
+                    header.style.opacity = '0';
+                    header.style.visibility = 'hidden';
+                }
+            } else {
+                // Xoay dọc - hiện header lại
+                if (header) {
+                    header.style.display = '';
+                    header.style.opacity = '';
+                    header.style.visibility = '';
+                }
+            }
+        }
+    });
+}
+
 
 function disableScroll() {
     // Lưu vị trí scroll hiện tại
