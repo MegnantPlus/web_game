@@ -935,44 +935,9 @@ function filterUpdates() {
     document.getElementById('updatesCount').textContent = `(${filtered.length})`;
 }
 
-// Hàm ẩn thanh địa chỉ khi xoay ngang
-function hideAddressBarOnLandscape() {
-    if (window.innerWidth < 768) {
-        // Kiểm tra nếu đang ở chế độ landscape
-        if (window.innerHeight < window.innerWidth) {
-            // Kỹ thuật 1: Scroll một chút để ẩn thanh địa chỉ
-            setTimeout(() => {
-                window.scrollTo(0, 1);
-            }, 100);
-            
-            // Kỹ thuật 2: Thêm class cho body
-            document.body.classList.add('landscape-mode');
-            
-            // Kỹ thuật 3: Thay đổi viewport meta
-            const viewport = document.querySelector('meta[name="viewport"]');
-            if (viewport) {
-                viewport.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
-            }
-        } else {
-            document.body.classList.remove('landscape-mode');
-        }
-    }
-}
 
-// Hàm đơn giản để ẩn thanh địa chỉ
-function hideAddressBar() {
-    // Chỉ chạy trên mobile
-    if (window.innerWidth < 768) {
-        // Cách đơn giản nhất: scroll xuống một chút
-        window.scrollTo(0, 1);
-        
-        // Thêm CSS để ẩn
-        document.body.style.height = '100vh';
-        document.body.style.overflow = 'hidden';
-    }
-}
 
-// Thêm vào hàm startGame()
+// Game functions
 function startGame() {
     const placeholder = document.getElementById('gamePlaceholder');
     
@@ -989,6 +954,19 @@ function startGame() {
     setTimeout(() => {
         placeholder.innerHTML = '';
         
+        // Tạo container cho game
+        const gameContainer = document.createElement('div');
+        gameContainer.id = 'gameContainer';
+        gameContainer.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            overflow: hidden;
+        `;
+        
         // Tạo iframe
         const iframe = document.createElement('iframe');
         iframe.id = 'gameFrame';
@@ -998,15 +976,20 @@ function startGame() {
             height: 100%;
             border: none;
             background: #000;
+            display: block;
         `;
         
-        placeholder.appendChild(iframe);
+        // Thêm vào DOM
+        gameContainer.appendChild(iframe);
+        placeholder.appendChild(gameContainer);
         
-        // Ẩn thanh địa chỉ trước khi vào fullscreen
-        hideAddressBar();
+        // Lưu vị trí scroll hiện tại
+        scrollPosition = window.pageYOffset || document.documentElement.scrollTop;
         
-        // Vào fullscreen
-        toggleFullscreen();
+        // Tự động vào fullscreen
+        if (!isFullscreen) {
+            toggleFullscreen();
+        }
         
         // Thêm nút exit
         const exitBtn = document.createElement('button');
@@ -1018,47 +1001,6 @@ function startGame() {
         document.getElementById('gamePlayer').appendChild(exitBtn);
         
     }, 1000);
-}
-
-// Lắng nghe sự kiện xoay màn hình
-function setupOrientationListener() {
-    // Kiểm tra khi trang load
-    window.addEventListener('load', hideAddressBarOnLandscape);
-    
-    // Kiểm tra khi resize (bao gồm xoay màn hình)
-    window.addEventListener('resize', hideAddressBarOnLandscape);
-    
-    // Kiểm tra khi xoay màn hình
-    window.addEventListener('orientationchange', function() {
-        setTimeout(hideAddressBarOnLandscape, 300);
-    });
-}
-
-// Thêm vào initializePage()
-function initializePage() {
-    console.log('🔄 Initializing page...');
-    
-    // Tạo admin account nếu chưa có
-    createAdminAccount();
-    
-    // Load session
-    loadSession();
-    
-    // Update UI based on login status
-    updateAuthUI();
-    
-    // Render comments ngay lập tức
-    renderComments();
-    
-    // Render updates
-    renderUpdates();
-    
-    // Setup event listeners
-    setupSmoothScroll();
-    setupFullscreenListener();
-    setupOrientationListener(); // Thêm dòng này
-    
-    console.log('✅ Page initialized');
 }
 
 function exitGame() {
