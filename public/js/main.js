@@ -935,6 +935,29 @@ function filterUpdates() {
     document.getElementById('updatesCount').textContent = `(${filtered.length})`;
 }
 
+function hideAddressBarSimple() {
+    if (window.innerHeight < window.innerWidth) { // Đang landscape
+        // Kỹ thuật đơn giản nhất
+        window.scrollTo(0, 1);
+        
+        // Thêm CSS
+        document.body.style.height = '100%';
+        document.body.style.overflow = 'hidden';
+        
+        // Ngăn không cho thanh địa chỉ hiện lại
+        window.addEventListener('scroll', function(e) {
+            if (window.pageYOffset === 0) {
+                window.scrollTo(0, 1);
+            }
+        });
+    }
+}
+
+// Gọi khi xoay màn hình
+window.addEventListener('orientationchange', hideAddressBarSimple);
+window.addEventListener('resize', hideAddressBarSimple);
+
+
 // Game functions
 function startGame() {
     const placeholder = document.getElementById('gamePlaceholder');
@@ -977,6 +1000,9 @@ function startGame() {
             display: block;
         `;
         
+         // Ẩn thanh địa chỉ
+            hideAddressBarSimple();
+
         // Thêm vào DOM
         gameContainer.appendChild(iframe);
         placeholder.appendChild(gameContainer);
