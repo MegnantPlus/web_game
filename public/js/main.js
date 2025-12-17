@@ -1494,3 +1494,30 @@ function initializePage() {
     
     console.log('✅ Page initialized');
 }
+// Tìm đoạn code cũ và thay thế bằng đoạn này:
+
+playBtn.addEventListener('click', () => {
+    // 1. Ẩn thumbnail, hiện game
+    thumbnailContainer.style.display = 'none';
+    gameContainer.style.display = 'block';
+
+    // 2. Yêu cầu Fullscreen trên CONTAINER CHA (quan trọng!)
+    if (gameContainer.requestFullscreen) {
+        gameContainer.requestFullscreen().catch(err => {
+            console.log("Lỗi fullscreen: ", err);
+            // Fallback nếu API bị chặn (đặc biệt trên iOS)
+            enablePseudoFullscreen(); 
+        });
+    } else if (gameContainer.webkitRequestFullscreen) { // Safari/Chrome cũ
+        gameContainer.webkitRequestFullscreen();
+    } else {
+        // Trường hợp trình duyệt không hỗ trợ API (ví dụ iPhone)
+        enablePseudoFullscreen();
+    }
+});
+
+// Hàm "Giả lập" Fullscreen cho mobile (CSS Only)
+function enablePseudoFullscreen() {
+    gameContainer.classList.add('pseudo-fullscreen');
+    document.body.style.overflow = 'hidden'; // Khóa cuộn trang
+}
