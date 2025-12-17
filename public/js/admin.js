@@ -20,12 +20,27 @@ function toggleAdminPanel() {
 function openAdminModal() {
     const adminModal = document.getElementById('adminModal');
     adminModal.style.display = 'flex';
+    
+    // Ẩn nút exit và fullscreen
+    if (typeof hideExitButton === 'function') hideExitButton();
+    if (typeof hideFullscreenButton === 'function') hideFullscreenButton();
+    
     loadAdminData();
     loadAdminPanelData();
 }
 
 function closeAdminModal() {
     document.getElementById('adminModal').style.display = 'none';
+    
+    // Hiện lại nút exit nếu đang fullscreen
+    if (isFullscreen && typeof showExitButton === 'function') {
+        showExitButton();
+    }
+    
+    // Hiện lại nút fullscreen nếu không fullscreen
+    if (!isFullscreen && typeof showFullscreenButton === 'function') {
+        showFullscreenButton();
+    }
 }
 
 // Admin tabs

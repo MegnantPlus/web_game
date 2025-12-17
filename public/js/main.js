@@ -136,6 +136,10 @@ function showAuthModal(mode = 'login') {
     const submitBtn = document.getElementById('authSubmitBtn');
     const switchText = document.getElementById('authSwitch');
     
+    // Ẩn nút exit và fullscreen
+    hideExitButton();
+    hideFullscreenButton();
+    
     document.getElementById('authError').textContent = '';
     document.getElementById('authEmail').value = '';
     document.getElementById('authPassword').value = '';
@@ -143,7 +147,6 @@ function showAuthModal(mode = 'login') {
         document.getElementById('authUsername').value = '';
     }
     
-    // Hiển thị/ẩn trường username dựa trên mode
     const usernameField = document.getElementById('usernameField');
     if (usernameField) {
         usernameField.style.display = mode === 'signup' ? 'block' : 'none';
@@ -152,31 +155,36 @@ function showAuthModal(mode = 'login') {
     if (mode === 'signup') {
         title.textContent = 'Sign up';
         submitBtn.textContent = 'Sign up';
-        switchText.innerHTML = 'Already have an account? <a href="javascript:void(0)" onclick="toggleAuthMode()">Log in</a>';
+        switchText.innerHTML = 'Already have an account? <a href="javascript:void(0)" onclick="toggleAuthMode(event)">Log in</a>';
     } else {
         title.textContent = 'Log in';
         submitBtn.textContent = 'Log in';
-        switchText.innerHTML = 'Don\'t have an account? <a href="javascript:void(0)" onclick="toggleAuthMode()">Sign up</a>';
+        switchText.innerHTML = 'Don\'t have an account? <a href="javascript:void(0)" onclick="toggleAuthMode(event)">Sign up</a>';
     }
     
     modal.style.display = 'flex';
-    
-    // NGĂN KHÔNG CHO SCROLL BACKGROUND
     document.body.style.overflow = 'hidden';
 }
 
 function closeAuthModal() {
     document.getElementById('authModal').style.display = 'none';
     
-    // Reset error state
+    // Hiện lại nút exit nếu đang fullscreen
+    if (isFullscreen) {
+        showExitButton();
+    }
+    
+    // Hiện lại nút fullscreen nếu không fullscreen
+    showFullscreenButton();
+    
     document.getElementById('authError').textContent = '';
     document.querySelectorAll('.auth-form input').forEach(input => {
         input.classList.remove('error');
     });
     
-    // KHÔI PHỤC SCROLL CHO BACKGROUND
     document.body.style.overflow = 'auto';
 }
+
 
 function toggleAuthMode(event) {
     if (event) {
@@ -1155,16 +1163,8 @@ function exitGame() {
         isFullscreen = false;
     }
     
-    // 5. Force re-show all elements
-    if (isMobileDevice) {
-        setTimeout(() => {
-            document.querySelectorAll('body > *').forEach(el => {
-                el.style.display = '';
-                el.style.visibility = '';
-                el.style.opacity = '';
-            });
-        }, 100);
-    }
+    // 5. Hiện lại nút fullscreen
+    showFullscreenButton();
     
     console.log('✅ Game exited');
 }
@@ -1260,33 +1260,22 @@ function enterMobileFullscreen(element) {
     
     isMobileFullscreenActive = true;
     
-    // 1. Áp dụng styles trước
+    // 1. Apply mobile styles
     applyMobileFullscreenStyles(element);
     
-    // 2. Lock orientation to landscape
-    if (screen.orientation && screen.orientation.lock) {
-        screen.orientation.lock('landscape')
-            .then(() => {
-                console.log('✅ Screen locked to landscape');
-            })
-            .catch(err => {
-                console.log('❌ Failed to lock orientation:', err);
-                forceLandscape();
-            });
-    } else {
-        forceLandscape();
-    }
+    // 2. Lock orientation
+    lockDeviceRotation();
     
     // 3. Hide browser UI
     hideBrowserUI();
     
-    // 4. Prevent all unwanted gestures
+    // 4. Prevent gestures
     preventAllGestures();
     
-    // 5. Add overlay to trap focus
+    // 5. Add overlay
     addFullscreenOverlay();
     
-    // 6. Request fullscreen if supported
+    // 6. Try native fullscreen
     requestFullscreenIfAvailable(element);
 }
 
@@ -1395,16 +1384,22 @@ function preventPinchZoom(e) {
 function applyMobileFullscreenStyles(element) {
     console.log('🎨 Applying mobile fullscreen styles');
     
-    // 1. Hide browser address bar
-    window.scrollTo(0, 1);
+    // Thêm class để CSS ẩn mọi thứ
+    document.body.classList.add('mobile-fullscreen-active');
     
-    // 2. Apply styles to body
-    document.body.style.overflow = 'hidden';
-    document.body.style.position = 'fixed';
-    document.body.style.width = '100%';
-    document.body.style.height = '100%';
+    // Ẩn TẤT CẢ mọi thứ trừ game
+    document.querySelectorAll('body > *').forEach(el => {
+        if (el.id !== 'gamePlayer' && 
+            !el.classList.contains('exit-game-btn') && 
+            el.id !== 'gameFrame') {
+            el.style.display = 'none';
+            el.style.visibility = 'hidden';
+            el.style.opacity = '0';
+            el.style.pointerEvents = 'none';
+        }
+    });
     
-    // 3. Apply styles to game player
+    // Apply styles to game player
     element.style.cssText = `
         position: fixed !important;
         top: 0 !important;
@@ -1422,7 +1417,7 @@ function applyMobileFullscreenStyles(element) {
         overflow: hidden !important;
     `;
     
-    // 4. Fix iframe rotation
+    // Fix iframe rotation
     const gameFrame = document.getElementById('gameFrame');
     if (gameFrame) {
         gameFrame.style.cssText = `
@@ -1560,33 +1555,27 @@ function exitMobileFullscreen() {
     
     isMobileFullscreenActive = false;
     
-    // 1. Unlock orientation
+    // 1. Remove CSS class
+    document.body.classList.remove('mobile-fullscreen-active');
+    
+    // 2. Unlock orientation
     if (screen.orientation && screen.orientation.unlock) {
         screen.orientation.unlock();
     }
     
-    // 2. Remove overlay
-    const overlay = document.getElementById('mobileFullscreenOverlay');
-    if (overlay) overlay.remove();
-    
-    // 3. Remove event listeners
-    if (window.fullscreenPreventFunction) {
-        const events = [
-            'touchstart', 'touchmove', 'touchend', 'touchcancel',
-            'gesturestart', 'gesturechange', 'gestureend',
-            'wheel', 'mousewheel', 'DOMMouseScroll'
-        ];
-        
-        events.forEach(event => {
-            document.removeEventListener(event, window.fullscreenPreventFunction, { 
-                capture: true 
-            });
-        });
-        
-        window.fullscreenPreventFunction = null;
+    // 3. Remove rotation lock
+    if (window.lockedRotationHandler) {
+        window.removeEventListener('orientationchange', window.lockedRotationHandler);
+        window.lockedRotationHandler = null;
     }
     
-    // 4. Restore all elements
+    // 4. Remove rotation message
+    const message = document.getElementById('rotationMessage');
+    if (message) {
+        message.remove();
+    }
+    
+    // 5. Restore all elements
     document.querySelectorAll('body > *').forEach(el => {
         el.style.cssText = '';
         el.style.display = '';
@@ -1595,25 +1584,21 @@ function exitMobileFullscreen() {
         el.style.pointerEvents = '';
     });
     
-    // 5. Restore game player
+    // 6. Restore game player
     const gamePlayer = document.getElementById('gamePlayer');
     if (gamePlayer) {
         gamePlayer.style.cssText = '';
         gamePlayer.classList.remove('fullscreen');
     }
     
-    // 6. Restore body and html
+    // 7. Restore body
     document.body.style.cssText = '';
-    document.documentElement.style.cssText = '';
-    document.body.classList.remove('mobile-fullscreen-forced');
     
-    // 7. Restore viewport meta
-    const meta = document.querySelector('meta[name="viewport"]');
-    if (meta) {
-        meta.content = 'width=device-width, initial-scale=1.0';
-    }
+    // 8. Remove overlay
+    const overlay = document.getElementById('mobileFullscreenOverlay');
+    if (overlay) overlay.remove();
     
-    // 8. Exit native fullscreen if active
+    // 9. Exit native fullscreen
     if (document.fullscreenElement || 
         document.webkitFullscreenElement ||
         document.mozFullScreenElement ||
@@ -1628,11 +1613,6 @@ function exitMobileFullscreen() {
         } else if (document.msExitFullscreen) {
             document.msExitFullscreen();
         }
-    }
-    
-    // 9. Force portrait orientation
-    if (screen.orientation && screen.orientation.lock) {
-        screen.orientation.lock('portrait');
     }
     
     // 10. Scroll to top
@@ -2421,4 +2401,62 @@ function showExitButton() {
         exitBtn.style.opacity = '1';
         exitBtn.style.pointerEvents = 'auto';
     }
+}
+function hideFullscreenButton() {
+    const fullscreenBtn = document.querySelector('.fullscreen-btn');
+    if (fullscreenBtn) {
+        fullscreenBtn.style.display = 'none';
+    }
+}
+function showFullscreenButton() {
+    const fullscreenBtn = document.querySelector('.fullscreen-btn');
+    if (fullscreenBtn && !isFullscreen) {
+        fullscreenBtn.style.display = 'flex';
+    }
+}
+function lockDeviceRotation() {
+    console.log('🔒 Locking device rotation');
+    
+    // Ngăn orientation change
+    const handleLockedRotation = function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        if (window.orientation !== 90 && window.orientation !== -90) {
+            console.log('🔄 Preventing portrait orientation');
+            forceLandscape();
+            showRotationMessage();
+        }
+        
+        return false;
+    };
+    
+    window.addEventListener('orientationchange', handleLockedRotation, { passive: false });
+    
+    // Force landscape
+    if (window.orientation !== 90 && window.orientation !== -90) {
+        forceLandscape();
+    }
+    
+    // Store for cleanup
+    window.lockedRotationHandler = handleLockedRotation;
+}
+function showRotationMessage() {
+    let message = document.getElementById('rotationMessage');
+    if (!message) {
+        message = document.createElement('div');
+        message.id = 'rotationMessage';
+        message.className = 'rotation-message';
+        message.innerHTML = `
+            <i class="fas fa-rotate-right"></i>
+            <h3>Please rotate to landscape</h3>
+            <p>This game requires landscape mode for the best experience</p>
+        `;
+        document.body.appendChild(message);
+    }
+    message.style.display = 'flex';
+    
+    setTimeout(() => {
+        message.style.display = 'none';
+    }, 3000);
 }
