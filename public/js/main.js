@@ -940,31 +940,42 @@ function startGame() {
         </div>
     `;
     
-    // Sau 1 giây load game
+    // Sau 1 giây load game - KHÔNG XOAY TỰ ĐỘNG
     setTimeout(() => {
         placeholder.innerHTML = '';
         
-        // Tạo iframe để load game
-        const iframe = document.createElement('iframe');
-        iframe.id = 'gameFrame';
-        iframe.src = 'Game/game.html';
-        iframe.style.cssText = `
+        // Tạo container cho game
+        const gameContainer = document.createElement('div');
+        gameContainer.id = 'gameContainer';
+        gameContainer.style.cssText = `
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            border: none;
             background: #000;
+            overflow: hidden;
         `;
         
-        // Thêm iframe vào placeholder
-        placeholder.appendChild(iframe);
+        // Tạo iframe - KHÔNG thêm rotation CSS
+        const iframe = document.createElement('iframe');
+        iframe.id = 'gameFrame';
+        iframe.src = 'Game/game.html';
+        iframe.style.cssText = `
+            width: 100%;
+            height: 100%;
+            border: none;
+            background: #000;
+            display: block;
+        `;
         
-        // Tự động vào fullscreen
-        if (!isFullscreen) {
-            toggleFullscreen();
-        }
+        // Thêm vào DOM
+        gameContainer.appendChild(iframe);
+        placeholder.appendChild(gameContainer);
+        
+        // KHÔNG tự động vào fullscreen ngay
+        // Chỉ hiển thị nút fullscreen để người dùng chủ động
+        showNotification('Game loaded! Tap fullscreen button to play', 'success');
         
         // Thêm nút exit
         const exitBtn = document.createElement('button');

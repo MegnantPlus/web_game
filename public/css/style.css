@@ -2144,267 +2144,75 @@ body.loaded .loading-overlay {
     }
 }
 
-/* ===== FIX FOR MOBILE FULLSCREEN ===== */
+/* ===== FIX FOR MOBILE FULLSCREEN - NO AUTO ROTATION ===== */
 @media (max-width: 768px) {
-    /* Đảm bảo game player căn giữa */
+    /* Game player bình thường */
     .game-player {
-        display: flex !important;
-        justify-content: center !important;
-        align-items: center !important;
-        position: relative !important;
-        overflow: hidden !important;
-        background-color: #000 !important;
-        margin-top: 100px !important;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        position: relative;
+        overflow: hidden;
+        background-color: #000;
+        margin-top: 100px;
+        max-width: 100%;
+        border-radius: 10px;
     }
     
-    /* Placeholder căn giữa hoàn toàn */
-    .game-placeholder {
-        width: 100% !important;
-        height: 100% !important;
-        padding-top: 0 !important;
-        display: flex !important;
-        justify-content: center !important;
-        align-items: center !important;
-        position: relative !important;
-    }
-    
-    .placeholder-content {
-        position: relative !important;
-        top: 0 !important;
-        left: 0 !important;
-        transform: none !important;
-        width: 100% !important;
-        height: 100% !important;
-        display: flex !important;
-        flex-direction: column !important;
-        justify-content: center !important;
-        align-items: center !important;
-    }
-    
-    /* Fullscreen mode FIX */
+    /* Fullscreen mode - KHÔNG XOAY */
     .game-player.fullscreen {
-        position: fixed !important;
-        top: 0 !important;
-        left: 0 !important;
-        width: 100vw !important;  /* Sửa thành vw thay vì % */
-        height: 100vh !important; /* Sửa thành vh thay vì % */
-        max-width: 100% !important;
-        margin: 0 !important;
-        border-radius: 0 !important;
-        z-index: 9999 !important;
-        background: #000 !important;
-        display: flex !important;
-        justify-content: center !important;
-        align-items: center !important;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        border-radius: 0;
+        z-index: 9999;
+        background: #000;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        /* KHÔNG CÓ TRANSFORM ROTATION Ở ĐÂY */
     }
     
-    /* Game iframe trong fullscreen */
+    /* Game iframe */
     #gameFrame {
-        width: 100% !important;
-        height: 100% !important;
-        max-width: 100% !important;
-        max-height: 100vh !important;
-        object-fit: contain !important;
-        position: absolute !important;
-        top: 0 !important;
-        left: 0 !important;
+        width: 100%;
+        height: 100%;
+        border: none;
+        background: #000;
     }
     
-    /* Nút fullscreen và exit */
-    .fullscreen-btn {
-        position: absolute !important; /* Sửa thành absolute */
-        bottom: 20px !important;
-        right: 20px !important;
-        z-index: 10001 !important;
-        background: rgba(0,0,0,0.7) !important;
-        color: white !important;
-        border: 1px solid rgba(255,255,255,0.3) !important;
-        font-size: 1.8rem !important;
-        width: 50px !important;
-        height: 50px !important;
-    }
-    
-    .exit-game-btn {
-        position: absolute !important;
-        top: 20px !important;
-        right: 20px !important;
-        z-index: 10001 !important;
-        background: rgba(255,71,87,0.9) !important;
-        color: white !important;
-        border: 1px solid rgba(255,255,255,0.3) !important;
-        font-size: 1.8rem !important;
-        width: 50px !important;
-        height: 50px !important;
-    }
-    
-    /* Khi xoay ngang điện thoại */
+    /* Khi xoay ngang - giữ nguyên */
     @media (orientation: landscape) {
-        .game-player:not(.fullscreen) {
-            max-height: 400px;
-        }
-        
         .game-player.fullscreen {
-            display: flex !important;
-            justify-content: center !important;
-            align-items: center !important;
-            background: #000 !important;
+            /* Landscape tự nhiên, không xoay */
         }
         
         #gameFrame {
-            width: 100% !important;
-            height: 100% !important;
-            max-width: 100% !important;
-            max-height: 100vh !important;
-            object-fit: contain !important;
+            /* Game sẽ tự điều chỉnh */
         }
     }
     
-    /* Khi xoay dọc điện thoại - FIX QUAN TRỌNG */
+    /* Khi xoay dọc - KHÔNG XOAY */
     @media (orientation: portrait) {
         .game-player.fullscreen {
-            width: 100vw !important;
-            height: 100vh !important;
-            min-width: 100vw !important; /* Thêm min-width để đảm bảo phủ hết */
-            min-height: 100vh !important; /* Thêm min-height để đảm bảo phủ hết */
-            display: flex !important;
-            justify-content: center !important;
-            align-items: center !important;
-            background: #000 !important;
-            overflow: hidden !important;
-            position: fixed !important;
-            top: 0 !important;
-            left: 0 !important;
-            right: 0 !important;
-            bottom: 0 !important;
+            /* Giữ portrait, không xoay */
+            transform: none !important;
         }
         
-        /* QUAN TRỌNG: Thay đổi object-fit để phủ hết chiều rộng */
-        .game-player.fullscreen #gameFrame {
-            width: 100vw !important;
-            height: 100vh !important;
-            max-width: none !important; /* Bỏ max-width để nó có thể mở rộng */
-            object-fit: cover !important; /* Thay contain bằng cover để phủ hết */
-            position: absolute !important;
-            top: 50% !important;
-            left: 50% !important;
-            transform: translate(-50%, -50%) !important;
-        }
-        
-        /* Nếu muốn giữ tỷ lệ game nhưng phủ hết chiều rộng */
-        .game-player.fullscreen #gameFrame.cover-width {
-            width: 100vw !important;
-            height: auto !important;
-            min-height: 100vh !important;
-            object-fit: fill !important;
+        #gameFrame {
+            /* Hiển thị game trong portrait */
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
         }
     }
 }
 
-/* Thêm CSS cho game placeholder để căn giữa tốt hơn */
-.run-game-btn {
-    z-index: 10 !important;
-    position: relative !important;
-}
-
-/* Đảm bảo khi fullscreen, game chiếm toàn bộ màn hình */
-body:fullscreen .game-player,
-body:-webkit-full-screen .game-player,
-body:-moz-full-screen .game-player {
-    width: 100vw !important;
-    height: 100vh !important;
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    margin: 0 !important;
-    border-radius: 0 !important;
-    display: flex !important;
-    justify-content: center !important;
-    align-items: center !important;
-}
-
-/* Reset margin/padding khi fullscreen */
-:fullscreen {
-    padding: 0 !important;
-    margin: 0 !important;
-}
-
-:fullscreen .game-player {
-    padding: 0 !important;
-    margin: 0 !important;
-    border: none !important;
-}
-
-/* Fix cho iOS Safari */
-@supports (-webkit-touch-callout: none) {
-    .game-player.fullscreen {
-        height: -webkit-fill-available !important;
-        width: -webkit-fill-available !important;
-    }
-    
-    @media (orientation: portrait) {
-        .game-player.fullscreen #gameFrame {
-            width: 100% !important;
-            height: auto !important;
-            min-height: -webkit-fill-available !important;
-        }
-    }
-}
-
-/* Thêm CSS để đảm bảo không có khoảng trắng */
-html, body {
-    margin: 0;
-    padding: 0;
-    overflow-x: hidden;
-}
-
-/* Fix viền xám khi fullscreen */
-body:fullscreen,
-body:-webkit-full-screen,
-body:-moz-full-screen {
-    background: #000 !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    overflow: hidden !important;
-}
-
-/* Nếu vẫn còn khoảng trắng, thử CSS này */
-@media (orientation: portrait) and (max-width: 768px) {
-    .game-player.fullscreen {
-        /* Đảm bảo chiếm toàn bộ viewport */
-        width: 100vw !important;
-        height: 100vh !important;
-        min-width: 100vw !important;
-        min-height: 100vh !important;
-        max-width: 100vw !important;
-        max-height: 100vh !important;
-        
-        /* Reset mọi padding/margin */
-        padding: 0 !important;
-        margin: 0 !important;
-        border: 0 !important;
-        
-        /* Đảm bảo không có overflow */
-        overflow: hidden !important;
-        box-sizing: border-box !important;
-    }
-    
-    .game-player.fullscreen #gameFrame {
-        /* Chiếm toàn bộ không gian */
-        width: 100% !important;
-        height: 100% !important;
-        min-width: 100% !important;
-        min-height: 100% !important;
-        
-        /* Giữ tỷ lệ hoặc phủ đầy */
-        object-fit: cover !important;
-        
-        /* Reset */
-        padding: 0 !important;
-        margin: 0 !important;
-        border: 0 !important;
-        display: block !important;
-    }
-}
+/* XÓA TẤT CẢ CSS ROTATION CŨ */
+/* Xóa các dòng có transform: rotate() */
 
 /* Fix cho iOS Safari */
 @supports (-webkit-touch-callout: none) {
