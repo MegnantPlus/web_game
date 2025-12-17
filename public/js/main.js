@@ -936,9 +936,6 @@ function filterUpdates() {
 }
 
 // Game functions
-let scrollPosition = 0;
-
-// Game functions - Sửa hàm startGame
 function startGame() {
     const placeholder = document.getElementById('gamePlaceholder');
     
@@ -955,6 +952,19 @@ function startGame() {
     setTimeout(() => {
         placeholder.innerHTML = '';
         
+        // Tạo container cho game
+        const gameContainer = document.createElement('div');
+        gameContainer.id = 'gameContainer';
+        gameContainer.style.cssText = `
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000;
+            overflow: hidden;
+        `;
+        
         // Tạo iframe
         const iframe = document.createElement('iframe');
         iframe.id = 'gameFrame';
@@ -964,13 +974,20 @@ function startGame() {
             height: 100%;
             border: none;
             background: #000;
+            display: block;
         `;
         
-        // Thêm iframe
-        placeholder.appendChild(iframe);
+        // Thêm vào DOM
+        gameContainer.appendChild(iframe);
+        placeholder.appendChild(gameContainer);
         
-        // Vào fullscreen
-        toggleFullscreen();
+        // Lưu vị trí scroll hiện tại
+        scrollPosition = window.pageYOffset || document.documentElement.scrollTop;
+        
+        // Tự động vào fullscreen
+        if (!isFullscreen) {
+            toggleFullscreen();
+        }
         
         // Thêm nút exit
         const exitBtn = document.createElement('button');
@@ -985,6 +1002,9 @@ function startGame() {
 }
 
 function exitGame() {
+    // Lưu vị trí scroll trước khi exit
+    scrollPosition = window.pageYOffset || document.documentElement.scrollTop;
+    
     // Xóa iframe game
     const gameFrame = document.getElementById('gameFrame');
     if (gameFrame) {
@@ -995,7 +1015,7 @@ function exitGame() {
     const exitBtn = document.querySelector('.exit-game-btn');
     if (exitBtn) exitBtn.remove();
     
-    // Khôi phục placeholder
+    // Khôi phục placeholder về ban đầu
     const placeholder = document.getElementById('gamePlaceholder');
     placeholder.innerHTML = `
         <div class="placeholder-content">
@@ -1006,10 +1026,30 @@ function exitGame() {
         </div>
     `;
     
-    // Thoát fullscreen
+    // Thoát fullscreen nếu đang ở chế độ fullscreen
     if (isFullscreen) {
-        toggleFullscreen();
+        // Mở lại scroll trước khi exit
+        enableScroll();
+        
+        // Thoát fullscreen
+        if (document.exitFullscreen) {
+            document.exitFullscreen();
+        } else if (document.mozCancelFullScreen) {
+            document.mozCancelFullScreen();
+        } else if (document.webkitExitFullscreen) {
+            document.webkitExitFullscreen();
+        } else if (document.msExitFullscreen) {
+            document.msExitFullscreen();
+        }
+        
+        document.getElementById('gamePlayer').classList.remove('fullscreen');
+        isFullscreen = false;
     }
+    
+    // Khôi phục scroll position
+    setTimeout(() => {
+        window.scrollTo(0, scrollPosition);
+    }, 100);
     
     showNotification('Game exited', 'info');
 }
@@ -1017,37 +1057,62 @@ function exitGame() {
 // Fullscreen functions
 function toggleFullscreen() {
     const gamePlayer = document.getElementById('gamePlayer');
+    const header = document.querySelector('.header');
     
     if (!isFullscreen) {
-        // Lưu vị trí scroll
-        scrollPosition = window.pageYOffset;
+        // Lưu vị trí scroll trước khi vào fullscreen
+        scrollPosition = window.pageYOffset || document.documentElement.scrollTop;
         
         // Chặn scroll
-        document.body.style.overflow = 'hidden';
-        document.body.style.position = 'fixed';
-        document.body.style.width = '100%';
+        disableScroll();
+        
+        // Ẩn header nếu ở landscape
+        if (window.innerWidth < 768 && window.matchMedia("(orientation: landscape)").matches) {
+            if (header) {
+                header.style.display = 'none';
+                header.style.opacity = '0';
+                header.style.visibility = 'hidden';
+            }
+        }
         
         if (gamePlayer.requestFullscreen) {
             gamePlayer.requestFullscreen();
+        } else if (gamePlayer.mozRequestFullScreen) {
+            gamePlayer.mozRequestFullScreen();
         } else if (gamePlayer.webkitRequestFullscreen) {
             gamePlayer.webkitRequestFullscreen();
+        } else if (gamePlayer.msRequestFullscreen) {
+            gamePlayer.msRequestFullscreen();
         }
         
-        gamePlayer.classList.add('fullscreen');
+        // Add mobile rotation class
+        if (window.innerWidth < 768) {
+            gamePlayer.classList.add('fullscreen');
+        }
     } else {
-        // Mở scroll
-        document.body.style.overflow = '';
-        document.body.style.position = '';
+        // Mở lại scroll
+        enableScroll();
+        
+        // Hiện lại header
+        if (header) {
+            header.style.display = '';
+            header.style.opacity = '';
+            header.style.visibility = '';
+        }
         
         if (document.exitFullscreen) {
             document.exitFullscreen();
+        } else if (document.mozCancelFullScreen) {
+            document.mozCancelFullScreen();
         } else if (document.webkitExitFullscreen) {
             document.webkitExitFullscreen();
+        } else if (document.msExitFullscreen) {
+            document.msExitFullscreen();
         }
         
         gamePlayer.classList.remove('fullscreen');
         
-        // Khôi phục scroll
+        // Restore scroll position
         window.scrollTo(0, scrollPosition);
     }
     
@@ -1058,26 +1123,62 @@ function toggleFullscreen() {
 function setupFullscreenListener() {
     document.addEventListener('fullscreenchange', updateFullscreenState);
     document.addEventListener('webkitfullscreenchange', updateFullscreenState);
+    document.addEventListener('mozfullscreenchange', updateFullscreenState);
+    document.addEventListener('MSFullscreenChange', updateFullscreenState);
+    
+    // Thêm listener để chặn scroll bằng touch trên mobile
+    document.addEventListener('touchmove', function(e) {
+        if (isFullscreen) {
+            e.preventDefault();
+        }
+    }, { passive: false });
 }
 
 function updateFullscreenState() {
-    if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+    const header = document.querySelector('.header');
+    
+    if (!document.fullscreenElement &&
+        !document.webkitFullscreenElement &&
+        !document.mozFullScreenElement &&
+        !document.msFullscreenElement) {
+        // Đã thoát fullscreen
         isFullscreen = false;
         document.getElementById('gamePlayer').classList.remove('fullscreen');
         
-        // Mở lại scroll
-        document.body.style.overflow = '';
-        document.body.style.position = '';
-        window.scrollTo(0, scrollPosition);
-    } else {
-        isFullscreen = true;
-        document.getElementById('gamePlayer').classList.add('fullscreen');
+        // Hiện lại header
+        if (header) {
+            header.style.display = '';
+            header.style.opacity = '';
+            header.style.visibility = '';
+        }
         
-        // Chặn scroll
-        scrollPosition = window.pageYOffset;
-        document.body.style.overflow = 'hidden';
-        document.body.style.position = 'fixed';
-        document.body.style.width = '100%';
+        // Mở lại scroll
+        enableScroll();
+        
+        // Khôi phục scroll position
+        setTimeout(() => {
+            window.scrollTo(0, scrollPosition);
+        }, 100);
+    } else {
+        // Đã vào fullscreen
+        isFullscreen = true;
+        
+        // Ẩn header nếu ở landscape trên mobile
+        if (window.innerWidth < 768 && window.matchMedia("(orientation: landscape)").matches) {
+            if (header) {
+                header.style.display = 'none';
+                header.style.opacity = '0';
+                header.style.visibility = 'hidden';
+            }
+        }
+        
+        if (window.innerWidth < 768) {
+            document.getElementById('gamePlayer').classList.add('fullscreen');
+        }
+        
+        // Lưu scroll position và chặn scroll
+        scrollPosition = window.pageYOffset || document.documentElement.scrollTop;
+        disableScroll();
     }
 }
 
