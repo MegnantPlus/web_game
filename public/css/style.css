@@ -2489,3 +2489,37 @@ body.no-scroll {
     height: 100% !important;
     border: none;
 }
+/* ===== HIDE BROWSER UI IN FULLSCREEN ===== */
+.game-player.fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    z-index: 9999;
+    background: #000;
+}
+
+/* Ẩn mọi thứ khác */
+.game-player.fullscreen ~ * {
+    display: none !important;
+}
+
+/* Chặn scroll */
+body:has(.game-player.fullscreen) {
+    overflow: hidden !important;
+}
+.exit-game-btn {
+    position: absolute;
+    top: 15px;
+    right: 15px;
+    background: rgba(255,71,87,0.9);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    font-size: 1.5rem;
+    cursor: pointer;
+    z-index: 10001;
+}
