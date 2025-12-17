@@ -2147,18 +2147,43 @@ if (isMobileDevice && !checkFullscreenSupport()) {
 function forceLandscape() {
     console.log('🔄 Forcing landscape mode');
     
-    // Force rotate using CSS
-    document.body.style.transform = 'rotate(90deg)';
-    document.body.style.transformOrigin = 'center';
-    document.body.style.width = '100vh';
-    document.body.style.height = '100vw';
-    document.body.style.position = 'fixed';
-    document.body.style.top = '50%';
-    document.body.style.left = '50%';
-    document.body.style.marginTop = '-50vw';
-    document.body.style.marginLeft = '-50vh';
+    // Ưu tiên Screen Orientation API nếu được hỗ trợ
+    if (screen.orientation && screen.orientation.lock) {
+        screen.orientation.lock('landscape')
+            .then(() => {
+                console.log('✅ Landscape locked via Orientation API');
+            })
+            .catch((error) => {
+                console.warn('⚠️ Orientation API failed, falling back to CSS:', error);
+                applyCSSRotation();
+            });
+    } else {
+        // Fallback dùng CSS khi API không khả dụng
+        console.log('🔄 Orientation API not available, using CSS fallback');
+        applyCSSRotation();
+    }
 }
+
+function applyCSSRotation() {
+    // Chỉ áp dụng CSS rotation nếu cần thiết
+    if (window.innerHeight > window.innerWidth) {
+        document.body.style.transform = 'rotate(90deg)';
+        document.body.style.transformOrigin = 'center';
+        document.body.style.width = '100vh';
+        document.body.style.height = '100vw';
+        document.body.style.position = 'fixed';
+        document.body.style.top = '50%';
+        document.body.style.left = '50%';
+        document.body.style.marginTop = '-50vw';
+        document.body.style.marginLeft = '-50vh';
+        document.body.style.overflow = 'hidden';
+    }
+}
+
+
+
 function hideBrowserUI() {
+    // Giữ nguyên hàm của bạn
     console.log('👻 Hiding browser UI');
     
     // Scroll to hide address bar
@@ -2188,6 +2213,7 @@ function hideBrowserUI() {
     document.body.style.overscrollBehavior = 'none';
     document.body.style.webkitOverflowScrolling = 'touch';
 }
+
 function preventAllGestures() {
     console.log('🛑 Blocking all gestures');
     
@@ -2459,4 +2485,222 @@ function showRotationMessage() {
     setTimeout(() => {
         message.style.display = 'none';
     }, 3000);
+}
+function initFullscreenLandscape() {
+    forceLandscape();
+    hideBrowserUI();
+    
+    // Xử lý resize/orientation change
+    window.addEventListener('resize', forceLandscape);
+    window.addEventListener('orientationchange', forceLandscape);
+}
+
+// Sử dụng
+initFullscreenLandscape();
+const run = document.getElementById("run");
+const canvas = document.getElementById("game");
+const orientationOverlay = document.getElementById("orientation-overlay") || createOrientationOverlay();
+
+// Tạo overlay cho portrait mode
+function createOrientationOverlay() {
+    const overlay = document.createElement("div");
+    overlay.id = "orientation-overlay";
+    overlay.style.cssText = `
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.9);
+        color: white;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        font-family: Arial, sans-serif;
+    `;
+    overlay.innerHTML = `
+        <div style="font-size: 3em; margin-bottom: 20px;">🔄</div>
+        <div style="font-size: 1.5em; text-align: center; padding: 0 20px;">
+            Vui lòng xoay ngang thiết bị để chơi game
+        </div>
+        <button id="force-landscape-btn" style="
+            margin-top: 30px;
+            padding: 10px 20px;
+            font-size: 1em;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+        ">Vẫn muốn chơi ở chế dọc</button>
+    `;
+    document.body.appendChild(overlay);
+    return overlay;
+}
+
+run.addEventListener("click", async () => {
+  await startGame();
+});
+
+async function startGame() {
+  try {
+    // 1. Vào fullscreen trước
+    await enterFullscreen();
+    
+    // 2. Sau đó lock landscape
+    await lockLandscape();
+    
+    // 3. Khởi tạo game
+    initGame();
+    
+    // 4. Ẩn overlay nếu có
+    orientationOverlay.style.display = "none";
+  } catch (error) {
+    console.error("Không thể khởi động game:", error);
+    // Fallback: vẫn hiển thị game nếu không fullscreen được
+    initGame();
+  }
+}
+
+async function enterFullscreen() {
+  const el = document.documentElement;
+  
+  if (el.requestFullscreen) {
+    await el.requestFullscreen();
+  } else if (el.webkitRequestFullscreen) { // Safari
+    await el.webkitRequestFullscreen();
+  } else if (el.mozRequestFullScreen) { // Firefox
+    await el.mozRequestFullScreen();
+  } else if (el.msRequestFullscreen) { // IE/Edge
+    await el.msRequestFullscreen();
+  }
+  
+  // Thêm CSS để ẩn browser UI
+  document.documentElement.style.overflow = "hidden";
+  document.body.style.overflow = "hidden";
+}
+
+async function lockLandscape() {
+  if (screen.orientation?.lock) {
+    try {
+      await screen.orientation.lock("landscape");
+    } catch (e) {
+      console.log("Orientation lock không khả dụng, dùng fallback");
+      // Fallback: dùng CSS transform nếu cần
+      if (isPortrait()) {
+        applyLandscapeFallback();
+      }
+    }
+  } else {
+    // Fallback cho trình duyệt không hỗ trợ
+    if (isPortrait()) {
+      applyLandscapeFallback();
+    }
+  }
+}
+
+function applyLandscapeFallback() {
+  console.log("Áp dụng fallback landscape");
+  // Có thể thêm CSS transform tại đây nếu muốn
+}
+
+function isPortrait() {
+  return window.matchMedia("(orientation: portrait)").matches || 
+         window.innerHeight > window.innerWidth;
+}
+
+function checkOrientation() {
+  if (isPortrait()) {
+    // Hiển thị overlay thay vì nút run
+    orientationOverlay.style.display = "flex";
+    canvas.style.display = "none";
+    run.style.display = "none";
+  } else {
+    orientationOverlay.style.display = "none";
+    canvas.style.display = "block";
+    run.style.display = "flex"; // Hiển thị nút chạy lại
+    resizeCanvas();
+  }
+}
+
+function resizeCanvas() {
+  const ratio = 16 / 9;
+  let w = window.innerWidth;
+  let h = window.innerHeight;
+
+  // Tính toán để giữ tỷ lệ và căn giữa
+  if (w / h > ratio) {
+    w = h * ratio;
+  } else {
+    h = w / ratio;
+  }
+
+  canvas.width = w * window.devicePixelRatio;
+  canvas.height = h * window.devicePixelRatio;
+  canvas.style.width = w + "px";
+  canvas.style.height = h + "px";
+  canvas.style.marginLeft = `${(window.innerWidth - w) / 2}px`;
+  canvas.style.marginTop = `${(window.innerHeight - h) / 2}px`;
+  
+  // Đảm bảo canvas không bị blur
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+}
+
+// Xử lý sự kiện
+window.addEventListener("resize", () => {
+  checkOrientation();
+  if (!isPortrait()) {
+    resizeCanvas();
+  }
+});
+
+window.addEventListener("orientationchange", () => {
+  setTimeout(checkOrientation, 100); // Delay để chờ resize xong
+});
+
+// Xử lý fullscreen change
+document.addEventListener("fullscreenchange", handleFullscreenChange);
+document.addEventListener("webkitfullscreenchange", handleFullscreenChange);
+
+function handleFullscreenChange() {
+  if (!document.fullscreenElement && 
+      !document.webkitFullscreenElement) {
+    // Người dùng thoát fullscreen
+    orientationOverlay.style.display = "none";
+    run.style.display = "flex";
+  }
+}
+
+// Prevent default touch behaviors
+canvas.addEventListener("touchstart", e => {
+  if (e.touches.length > 1) e.preventDefault();
+}, { passive: false });
+
+canvas.addEventListener("touchmove", e => {
+  if (e.touches.length > 1) e.preventDefault();
+}, { passive: false });
+
+// Prevent context menu
+canvas.addEventListener("contextmenu", e => e.preventDefault());
+
+// Khởi tạo ban đầu
+checkOrientation();
+
+// Thêm nút fallback cho người dùng muốn chơi ở portrait
+document.getElementById("force-landscape-btn")?.addEventListener("click", () => {
+  orientationOverlay.style.display = "none";
+  canvas.style.display = "block";
+  initGame();
+  resizeCanvas();
+});
+
+// Hàm initGame mẫu
+function initGame() {
+  console.log("Game started!");
+  // Khởi tạo game logic của bạn ở đây
+  resizeCanvas();
 }
