@@ -2486,14 +2486,4 @@ function showRotationMessage() {
         message.style.display = 'none';
     }, 3000);
 }
-function initFullscreenLandscape() {
-    forceLandscape();
-    hideBrowserUI();
-    
-    // Xử lý resize/orientation change
-    window.addEventListener('resize', forceLandscape);
-    window.addEventListener('orientationchange', forceLandscape);
-}
-
-// Sử dụng
-initFullscreenLandscape();
+// Thêm
