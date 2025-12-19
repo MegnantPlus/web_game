@@ -1,399 +1,311 @@
-// userSystem.js - SIMPLIFIED VERSION FOR API WITH EMAIL SUPPORT
+// userSystem.js - SIMPLIFIED API CLIENT FOR FRONTEND
 class UserSystem {
     constructor() {
+        this.API_BASE = 'http://localhost:3000/api';
+        this.token = localStorage.getItem('pickleball_token');
         this.currentUser = null;
-        this.users = JSON.parse(localStorage.getItem('pickleball_users')) || [];
-        this.updates = JSON.parse(localStorage.getItem('pickleball_updates')) || [];
-        this.loadSession();
-        this.createDefaultAdmin();
-    }
-    
-    // Hash function - SAME AS MAIN.JS
-    hashPassword(password) {
-        let hash = 5381;
-        for (let i = 0; i < password.length; i++) {
-            hash = (hash * 33) ^ password.charCodeAt(i);
-        }
-        return (hash >>> 0).toString(36);
-    }
-    
-    // ============ EMAIL VALIDATION ============
-    isValidEmail(email) {
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return emailRegex.test(email);
-    }
-    
-    // ============ SIGN UP (WITH EMAIL) ============
-    signUp(username, email, password) {
-    // Validate inputs
-    if (!username || !email || !password) {
-        return { success: false, message: "Please fill in all fields" };
-    }
-    
-    // Validate username
-    if (username.length < 3 || username.length > 20) {
-        return { success: false, message: "Username must be 3-20 characters" };
-    }
-    
-    // Validate email
-    if (!this.isValidEmail(email)) {
-        return { success: false, message: "Please enter a valid email address" };
-    }
-    
-    // Validate password - ĐÃ THAY ĐỔI TỪ 6 THÀNH 8
-    if (password.length < 8) {
-        return { success: false, message: "Password must be at least 8 characters" };
-    }
-    
-    // Check if username exists
-    if (this.users.find(u => u.username.toLowerCase() === username.toLowerCase())) {
-        return { success: false, message: "Username already exists" };
-    }
-    
-    // Check if email exists
-    if (this.users.find(u => u.email && u.email.toLowerCase() === email.toLowerCase())) {
-        return { success: false, message: "Email already registered" };
-    }
-    
-    // Create new user with email
-    const newUser = {
-        id: Date.now().toString(),
-        username: username.trim(),
-        email: email.trim().toLowerCase(),
-        password: this.hashPassword(password),
-        createdAt: Date.now(),
-        banned: false,
-        admin: username === 'Dmaster',
-        isBanned: false,
-        isAdmin: username === 'Dmaster'
-    };
-    
-    this.users.push(newUser);
-    this.saveToStorage();
-    
-    return { 
-        success: true, 
-        message: "Account created successfully! Please log in.",
-        user: newUser 
-    };
-}
-    
-    // ============ LOGIN (WITH EMAIL) ============
-    login(email, password) {
-        // Validate inputs
-        if (!email || !password) {
-            return { success: false, message: "Please fill in all fields" };
-        }
         
-        const emailLower = email.trim().toLowerCase();
-        
-        // Find user by email
-        const user = this.users.find(u => u.email && u.email.toLowerCase() === emailLower);
-        
-        if (!user) {
-            return { success: false, message: "Invalid email or password" };
-        }
-        
-        // Verify password
-        if (user.password !== this.hashPassword(password)) {
-            return { success: false, message: "Invalid email or password" };
-        }
-        
-        // Check if banned
-        if (user.banned || user.isBanned) {
-            return { success: false, message: "This account has been banned!" };
-        }
-        
-        // Success - set current user
-        this.currentUser = user;
-        this.saveSession();
-        
-        return { 
-            success: true, 
-            message: "Logged in successfully!",
-            user: user 
-        };
-    }
-    
-    // ============ LOGOUT ============
-    logout() {
-        this.currentUser = null;
-        localStorage.removeItem('pickleball_session');
-        return { success: true, message: "Logged out successfully!" };
-    }
-    
-    // ============ SESSION MANAGEMENT ============
-    saveSession() {
-        if (this.currentUser) {
-            localStorage.setItem('pickleball_session', this.currentUser.username);
+        // Load user from token if exists
+        if (this.token) {
+            this.loadUserFromToken();
         }
     }
-    
-    loadSession() {
-        const sessionUsername = localStorage.getItem('pickleball_session');
-        if (sessionUsername) {
-            const user = this.users.find(u => u.username === sessionUsername);
-            if (user && !(user.banned || user.isBanned)) {
-                this.currentUser = user;
+
+    // ============ LOAD USER FROM TOKEN ============
+    async loadUserFromToken() {
+        if (!this.token) return;
+        
+        try {
+            const response = await fetch(`${this.API_BASE}/verify-token`, {
+                headers: {
+                    'Authorization': `Bearer ${this.token}`
+                }
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.user) {
+                    this.currentUser = data.user;
+                }
+            } else {
+                // Token invalid, clear it
+                this.clearToken();
             }
+        } catch (error) {
+            console.error('Failed to verify token:', error);
+            this.clearToken();
         }
     }
+
+    // ============ CLEAR TOKEN ============
+    clearToken() {
+        this.token = null;
+        this.currentUser = null;
+        localStorage.removeItem('pickleball_token');
+    }
+
+    // ============ API CALL METHOD ============
+    async apiCall(endpoint, method = 'GET', data = null) {
+        const options = {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            }
+        };
+
+        // Add token if exists
+        if (this.token) {
+            options.headers['Authorization'] = `Bearer ${this.token}`;
+        }
+
+        if (data) {
+            options.body = JSON.stringify(data);
+        }
+
+        try {
+            const response = await fetch(`${this.API_BASE}${endpoint}`, options);
+            const result = await response.json();
+            
+            if (!response.ok) {
+                // If unauthorized, clear token
+                if (response.status === 401) {
+                    this.clearToken();
+                }
+                throw new Error(result.error || `HTTP ${response.status}`);
+            }
+            
+            return result;
+        } catch (error) {
+            console.error('API Error:', error.message);
+            throw error;
+        }
+    }
+
+    // ============ AUTHENTICATION METHODS ============
     
-    // ============ CREATE DEFAULT ADMIN ============
-    createDefaultAdmin() {
-        const adminExists = this.users.find(u => 
-            u.username === 'Dmaster' && u.email === 'abc@gmail.com'
-        );
-        
-        if (!adminExists) {
-            const adminUser = {
-                id: "admin_001",
-                username: 'Dmaster',
-                email: 'abc@gmail.com',
-                password: this.hashPassword('010101'),
-                createdAt: Date.now(),
-                banned: false,
-                admin: true,
-                isBanned: false,
-                isAdmin: true
+    async signUp(username, email, password) {
+        try {
+            const result = await this.apiCall('/signup', 'POST', {
+                username,
+                email,
+                password
+            });
+            
+            if (result.token) {
+                this.token = result.token;
+                localStorage.setItem('pickleball_token', result.token);
+                this.currentUser = result.user;
+            }
+            
+            return result;
+        } catch (error) {
+            return {
+                success: false,
+                message: error.message
             };
-            this.users.push(adminUser);
-            this.saveToStorage();
-            console.log('✅ Default admin account created');
         }
     }
-    
-    // ============ ADMIN FUNCTIONS ============
-    isAdmin() {
-        return this.currentUser && (this.currentUser.admin || this.currentUser.isAdmin);
-    }
-    
-    isBanned() {
-        return this.currentUser && (this.currentUser.banned || this.currentUser.isBanned);
-    }
-    
-    // ============ USER MANAGEMENT ============
-    getAllUsers() {
-        return this.users.filter(user => user.username !== 'Dmaster');
-    }
-    
-    getBannedUsers() {
-        return this.users.filter(user => user.banned || user.isBanned);
-    }
-    
-    getAdmins() {
-        return this.users.filter(user => user.admin || user.isAdmin);
-    }
-    
-    banUser(userId) {
-        if (!this.isAdmin()) return false;
-        
-        const user = this.users.find(u => u.id === userId || u.username === userId);
-        if (user && !(user.banned || user.isBanned)) {
-            user.banned = true;
-            user.isBanned = true;
+
+    async signIn(email, password) {
+        try {
+            const result = await this.apiCall('/signin', 'POST', {
+                email,
+                password
+            });
             
-            // If current user is being banned, log them out
-            if (this.currentUser && (this.currentUser.id === userId || this.currentUser.username === userId)) {
-                this.logout();
+            if (result.token) {
+                this.token = result.token;
+                localStorage.setItem('pickleball_token', result.token);
+                this.currentUser = result.user;
             }
             
-            this.saveToStorage();
-            return true;
+            return result;
+        } catch (error) {
+            return {
+                success: false,
+                message: error.message
+            };
         }
-        return false;
     }
-    
-    unbanUser(userId) {
-        if (!this.isAdmin()) return false;
-        
-        const user = this.users.find(u => u.id === userId || u.username === userId);
-        if (user && (user.banned || user.isBanned)) {
-            user.banned = false;
-            user.isBanned = false;
-            this.saveToStorage();
-            return true;
-        }
-        return false;
-    }
-    
-    makeAdmin(userId) {
-        if (!this.isAdmin()) return false;
-        
-        const user = this.users.find(u => u.id === userId || u.username === userId);
-        if (user && !(user.admin || user.isAdmin)) {
-            user.admin = true;
-            user.isAdmin = true;
-            this.saveToStorage();
-            return true;
-        }
-        return false;
-    }
-    
-    removeAdmin(userId) {
-        if (!this.isAdmin()) return false;
-        
-        // Don't remove admin from Dmaster
-        const user = this.users.find(u => u.id === userId || u.username === userId);
-        if (user && user.username === 'Dmaster') {
-            return false;
+
+    async signOut() {
+        try {
+            await this.apiCall('/signout', 'POST');
+        } catch (error) {
+            console.error('Sign out error:', error);
+        } finally {
+            this.clearToken();
         }
         
-        if (user && (user.admin || user.isAdmin)) {
-            user.admin = false;
-            user.isAdmin = false;
-            this.saveToStorage();
-            return true;
+        return { success: true, message: "Signed out successfully!" };
+    }
+
+    // ============ USER METHODS ============
+    
+    async getProfile() {
+        try {
+            const result = await this.apiCall('/profile', 'GET');
+            return result;
+        } catch (error) {
+            return { success: false, error: error.message };
         }
-        return false;
     }
-    
-    deleteUser(userId) {
-        if (!this.isAdmin()) return false;
+
+    async isAdmin() {
+        if (!this.currentUser) return false;
         
-        // Don't delete Dmaster
-        const user = this.users.find(u => u.id === userId || u.username === userId);
-        if (user && user.username === 'Dmaster') {
-            return false;
+        try {
+            const result = await this.apiCall('/check-admin', 'GET');
+            return result.isAdmin || false;
+        } catch (error) {
+            return this.currentUser.isAdmin || false;
         }
-        
-        const initialLength = this.users.length;
-        this.users = this.users.filter(u => u.id !== userId && u.username !== userId);
-        
-        // If current user is being deleted, log them out
-        if (this.currentUser && (this.currentUser.id === userId || this.currentUser.username === userId)) {
-            this.logout();
+    }
+
+    // ============ COMMENTS METHODS ============
+    
+    async getComments() {
+        try {
+            const result = await this.apiCall('/comments', 'GET');
+            return result;
+        } catch (error) {
+            console.error('Failed to load comments:', error);
+            return { comments: [] };
         }
-        
-        if (this.users.length < initialLength) {
-            this.saveToStorage();
-            return true;
+    }
+
+    async postComment(content) {
+        try {
+            const result = await this.apiCall('/comments', 'POST', { content });
+            return result;
+        } catch (error) {
+            return { success: false, error: error.message };
         }
-        return false;
     }
-    
-    // ============ UPDATES MANAGEMENT ============
-    addUpdate(title, content) {
-        if (!this.isAdmin()) return false;
-        
-        const newUpdate = {
-            id: Date.now(),
-            title: title,
-            content: content,
-            author: this.currentUser.username,
-            authorId: this.currentUser.id,
-            createdAt: Date.now()
-        };
-        
-        this.updates.push(newUpdate);
-        this.saveToStorage();
-        return newUpdate;
-    }
-    
-    editUpdate(updateId, title, content) {
-        if (!this.isAdmin()) return false;
-        
-        const update = this.updates.find(u => u.id === updateId);
-        if (!update) return false;
-        
-        update.title = title;
-        update.content = content;
-        update.updatedAt = Date.now();
-        
-        this.saveToStorage();
-        return true;
-    }
-    
-    deleteUpdate(updateId) {
-        if (!this.isAdmin()) return false;
-        
-        const initialLength = this.updates.length;
-        this.updates = this.updates.filter(u => u.id !== updateId);
-        
-        if (this.updates.length < initialLength) {
-            this.saveToStorage();
-            return true;
+
+    async voteComment(commentId, voteType) {
+        try {
+            const result = await this.apiCall(`/comments/${commentId}/vote`, 'POST', { 
+                vote: voteType 
+            });
+            return result;
+        } catch (error) {
+            return { success: false, error: error.message };
         }
-        return false;
     }
-    
-    getAllUpdates() {
-        return this.updates;
-    }
-    
-    // ============ BACKWARD COMPATIBILITY ============
-    // Helper function to migrate old users to new format
-    migrateOldUsers() {
-        let migrated = false;
-        this.users.forEach(user => {
-            if (!user.email) {
-                // Create placeholder email for old users
-                user.email = `${user.username.toLowerCase()}@pickleball.com`;
-                migrated = true;
-            }
-            
-            // Ensure both old and new properties exist
-            if (user.isAdmin !== undefined && user.admin === undefined) {
-                user.admin = user.isAdmin;
-            }
-            if (user.admin !== undefined && user.isAdmin === undefined) {
-                user.isAdmin = user.admin;
-            }
-            if (user.isBanned !== undefined && user.banned === undefined) {
-                user.banned = user.isBanned;
-            }
-            if (user.banned !== undefined && user.isBanned === undefined) {
-                user.isBanned = user.banned;
-            }
-        });
-        
-        if (migrated) {
-            this.saveToStorage();
+
+    async deleteComment(commentId) {
+        try {
+            const result = await this.apiCall(`/comments/${commentId}`, 'DELETE');
+            return result;
+        } catch (error) {
+            return { success: false, error: error.message };
         }
-        return migrated;
     }
+
+    // ============ UPDATES METHODS ============
     
-    // ============ STORAGE ============
-    saveToStorage() {
-        localStorage.setItem('pickleball_users', JSON.stringify(this.users));
-        localStorage.setItem('pickleball_updates', JSON.stringify(this.updates));
+    async getUpdates() {
+        try {
+            const result = await this.apiCall('/updates', 'GET');
+            return result;
+        } catch (error) {
+            console.error('Failed to load updates:', error);
+            return { updates: [] };
+        }
     }
-    
-    // ============ UTILITY FUNCTIONS ============
-    getUserByEmail(email) {
-        const emailLower = email.trim().toLowerCase();
-        return this.users.find(u => u.email && u.email.toLowerCase() === emailLower);
+
+    async postUpdate(title, content) {
+        try {
+            const result = await this.apiCall('/updates', 'POST', { 
+                title, 
+                content 
+            });
+            return result;
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
     }
-    
-    getUserByUsername(username) {
-        const usernameLower = username.trim().toLowerCase();
-        return this.users.find(u => u.username.toLowerCase() === usernameLower);
+
+    async editUpdate(updateId, title, content) {
+        try {
+            const result = await this.apiCall(`/updates/${updateId}`, 'PUT', { 
+                title, 
+                content 
+            });
+            return result;
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
     }
-    
-    // Check if user exists by email or username
-    userExists(identifier) {
-        return this.users.find(u => 
-            (u.email && u.email.toLowerCase() === identifier.toLowerCase()) ||
-            u.username.toLowerCase() === identifier.toLowerCase()
-        );
+
+    async deleteUpdate(updateId) {
+        try {
+            const result = await this.apiCall(`/updates/${updateId}`, 'DELETE');
+            return result;
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
     }
+
+    // ============ ADMIN METHODS ============
     
-    // Get user statistics
-    getUserStats() {
-        return {
-            totalUsers: this.users.filter(u => u.username !== 'Dmaster').length,
-            totalAdmins: this.getAdmins().length,
-            totalBanned: this.getBannedUsers().length,
-            totalUpdates: this.updates.length
-        };
+    async getUsers() {
+        try {
+            const result = await this.apiCall('/users', 'GET');
+            return result;
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    }
+
+    async banUser(userId) {
+        try {
+            const result = await this.apiCall(`/users/${userId}/ban`, 'PUT');
+            return result;
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    }
+
+    async deleteUser(userId) {
+        try {
+            const result = await this.apiCall(`/users/${userId}`, 'DELETE');
+            return result;
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    }
+
+    // ============ UTILITY METHODS ============
+    
+    isLoggedIn() {
+        return !!this.currentUser;
+    }
+
+    getUser() {
+        return this.currentUser;
+    }
+
+    getToken() {
+        return this.token;
+    }
+
+    // Check if user can delete comment (owner or admin)
+    canDeleteComment(commentAuthor) {
+        if (!this.currentUser) return false;
+        
+        return this.currentUser.username === commentAuthor || 
+               (this.currentUser.isAdmin !== undefined && this.currentUser.isAdmin);
+    }
+
+    // Check if user can delete update (admin only)
+    canDeleteUpdate() {
+        if (!this.currentUser) return false;
+        return this.currentUser.isAdmin !== undefined && this.currentUser.isAdmin;
     }
 }
 
 // Create global instance
 window.userSystem = new UserSystem();
-
-// Auto-migrate old users on load
-window.userSystem.migrateOldUsers();
-
-// Re-load session
-window.userSystem.loadSession();

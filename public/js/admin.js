@@ -81,30 +81,28 @@ function updateAdminStats() {
 }
 
 // Load users list - UPDATED WITH EMAIL DISPLAY
+
 function loadUsersList() {
     const usersList = document.getElementById('usersList');
     if (!usersList) return;
     
     loadAdminData();
     
-    // Filter out admin user
-    const regularUsers = adminUsers.filter(user => user.username !== 'Dmaster');
-    
-    usersList.innerHTML = regularUsers.map((user, index) => {
-        const commentCount = getUserComments(user.username);
-        const userEmail = user.email || 'No email';
+    usersList.innerHTML = adminUsers.map((user, index) => {
+        const isAdmin = user.admin || user.isAdmin;
         const isBanned = user.banned || user.isBanned;
+        const isSystemAdmin = user.isSystemAdmin;
         
         return `
             <div class="user-item ${isBanned ? 'banned' : ''}" style="animation-delay: ${index * 0.1}s">
                 <div class="user-info">
                     <strong>${user.username} 
-                        ${user.admin || user.isAdmin ? '<span style="color: #2196F3; font-size: 0.8rem;">[ADMIN]</span>' : ''}
+                        ${isAdmin ? '<span style="color: #2196F3; font-size: 0.8rem;">[ADMIN]</span>' : ''}
+                        ${isSystemAdmin ? '<span style="color: #8f4cc5; font-size: 0.8rem;">[SYSTEM]</span>' : ''}
                     </strong>
                     <div class="user-details">
-                        <small><i class="fas fa-envelope"></i> ${userEmail}</small>
+                        <small><i class="fas fa-envelope"></i> ${user.email || 'No email'}</small>
                         <small><i class="far fa-calendar"></i> ${new Date(user.createdAt).toLocaleDateString()}</small>
-                        <small><i class="far fa-comment"></i> ${commentCount} comments</small>
                         ${isBanned ? 
                             '<small style="color:#ff4757"><i class="fas fa-ban"></i> BANNED</small>' : 
                             '<small><i class="far fa-check-circle"></i> Active</small>'
@@ -120,17 +118,20 @@ function loadUsersList() {
                             <i class="fas fa-ban"></i> Ban
                         </button>`
                     }
-                    ${!(user.admin || user.isAdmin) ? 
+                    ${!isAdmin && !isSystemAdmin ? 
                         `<button class="promote-btn" onclick="makeAdmin('${user.id || user.username}')">
                             <i class="fas fa-crown"></i> Make Admin
                         </button>` : 
+                        !isSystemAdmin ?
                         `<button class="demote-btn" onclick="removeAdmin('${user.id || user.username}')">
                             <i class="fas fa-user"></i> Remove Admin
-                        </button>`
+                        </button>` : ''
                     }
-                    <button class="delete-user-btn" onclick="deleteUser('${user.id || user.username}')">
-                        <i class="fas fa-trash"></i> Delete
-                    </button>
+                    ${!isSystemAdmin ? 
+                        `<button class="delete-user-btn" onclick="deleteUser('${user.id || user.username}')">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>` : ''
+                    }
                 </div>
             </div>
         `;
@@ -355,36 +356,31 @@ function makeAdmin(userIdentifier) {
 }
 
 function removeAdmin(userIdentifier) {
-    if (!currentUser || !currentUser.admin) {
-        showNotification('Admin only!', 'error');
-        return;
-    }
-    
-    // Don't allow removing admin from Dmaster
-    if (userIdentifier === 'Dmaster' || userIdentifier === 'admin_001') {
-        showNotification('Cannot remove admin from system administrator!', 'error');
-        return;
-    }
-    
-    if (!confirm(`Remove admin rights from ${userIdentifier}?`)) return;
-    
+    // Kiểm tra bằng ID hoặc isSystemAdmin flag thay vì username
     loadAdminData();
     
-    const userIndex = adminUsers.findIndex(u => 
+    const user = adminUsers.find(u => 
         u.id === userIdentifier || u.username === userIdentifier
     );
     
-    if (userIndex !== -1 && (adminUsers[userIndex].admin || adminUsers[userIndex].isAdmin)) {
-        // Set admin: false
-        adminUsers[userIndex].admin = false;
-        adminUsers[userIndex].isAdmin = false;
+    if (!user) return;
+    
+    // Kiểm tra nếu là system admin (thêm property mới)
+    if (user.isSystemAdmin) {
+        showNotification('Cannot remove system administrator!', 'error');
+        return;
+    }
+    
+    if (confirm(`Remove admin rights from ${user.username}?`)) {
+        // Gọi API hoặc xử lý local
+        user.admin = false;
+        user.isAdmin = false;
         localStorage.setItem('pickleball_users', JSON.stringify(adminUsers));
-        
-        showNotification(`Admin rights removed from ${adminUsers[userIndex].username}!`, 'success');
+        showNotification(`Admin rights removed from ${user.username}!`, 'success');
         loadUsersList();
-        updateAdminStats();
     }
 }
+
 
 function deleteUser(userIdentifier) {
     if (!currentUser || !currentUser.admin) {
@@ -392,22 +388,35 @@ function deleteUser(userIdentifier) {
         return;
     }
     
-    // Don't allow deleting admin
-    if (userIdentifier === 'Dmaster' || userIdentifier === 'admin_001') {
-        showNotification('Cannot delete system administrator!', 'error');
-        return;
-    }
-    
-    if (!confirm(`Delete user ${userIdentifier} and all their comments? This cannot be undone.`)) return;
-    
     loadAdminData();
     
-    // Tìm user để lấy username
+    // Tìm user để lấy thông tin
     const user = adminUsers.find(u => 
         u.id === userIdentifier || u.username === userIdentifier
     );
     
     if (!user) return;
+    
+    // KHÔNG kiểm tra username cụ thể nữa
+    // Thay vào đó kiểm tra isSystemAdmin hoặc firstAdmin flag
+    if (user.isSystemAdmin) {
+        showNotification('Cannot delete system administrator!', 'error');
+        return;
+    }
+    
+    // Không cho xóa chính mình
+    if (currentUser && 
+        (currentUser.id === userIdentifier || currentUser.username === userIdentifier)) {
+        showNotification('You cannot delete your own account!', 'error');
+        return;
+    }
+    
+    // Không cho xóa admin khác (tùy chọn - bỏ nếu muốn)
+    if ((user.admin || user.isAdmin) && !confirm(`WARNING: ${user.username} is an admin. Delete anyway?`)) {
+        return;
+    }
+    
+    if (!confirm(`Delete user ${user.username} and all their comments? This cannot be undone.`)) return;
     
     const username = user.username;
     
@@ -419,7 +428,10 @@ function deleteUser(userIdentifier) {
     
     // Delete user's comments
     if (window.commentsData) {
+        // Xóa comments chính
         window.commentsData = window.commentsData.filter(comment => comment.author !== username);
+        
+        // Xóa replies của user trong các comment khác
         window.commentsData.forEach(comment => {
             if (comment.replies) {
                 comment.replies = comment.replies.filter(reply => reply.author !== username);
@@ -428,10 +440,14 @@ function deleteUser(userIdentifier) {
         localStorage.setItem('pickleball_comments', JSON.stringify(window.commentsData));
     }
     
-    // If user is currently logged in, log them out
-    if (currentUser && 
-        (currentUser.id === userIdentifier || currentUser.username === userIdentifier)) {
-        logout();
+    // Nếu user đang login, logout họ
+    const sessionUsername = localStorage.getItem('pickleball_session');
+    if (sessionUsername === username) {
+        localStorage.removeItem('pickleball_session');
+        // Refresh page để logout
+        if (!currentUser || currentUser.username === username) {
+            location.reload();
+        }
     }
     
     showNotification(`User ${username} deleted!`, 'success');

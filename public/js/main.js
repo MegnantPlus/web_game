@@ -15,32 +15,9 @@ function simpleHash(password) {
     return (hash >>> 0).toString(36);
 }
 
-// TẠO ADMIN TÀI KHOẢN TỰ ĐỘNG
-function createAdminAccount() {
-    let users = JSON.parse(localStorage.getItem('pickleball_users') || '[]');
-    const adminExists = users.find(u => u.username === 'Dmaster' && u.email === 'abc@gmail.com');
-    
-    if (!adminExists) {
-        const adminUser = {
-            username: 'Dmaster',
-            email: 'abc@gmail.com',
-            password: simpleHash('010101'),
-            createdAt: Date.now(),
-            isAdmin: true,
-            isBanned: false
-        };
-        users.push(adminUser);
-        localStorage.setItem('pickleball_users', JSON.stringify(users));
-        console.log('✅ Admin account created: Dmaster / 010101 / abc@gmail.com');
-    }
-}
-
 // Initialize everything
 function initializePage() {
     console.log('🔄 Initializing page...');
-    
-    // Tạo admin account nếu chưa có
-    createAdminAccount();
     
     // Load session
     loadSession();
@@ -280,10 +257,6 @@ function updateAuthUI() {
     const usernameDisplay = document.getElementById('usernameDisplay');
     const userAvatar = document.getElementById('userAvatar');
     const adminPanel = document.getElementById('adminPanel');
-    const loginToComment = document.getElementById('loginToComment');
-    const commentInputSection = document.getElementById('commentInputSection');
-    
-    console.log('Updating auth UI, current user:', currentUser);
     
     if (currentUser) {
         authButtons.style.display = 'none';
@@ -291,7 +264,8 @@ function updateAuthUI() {
         usernameDisplay.textContent = currentUser.username;
         userAvatar.textContent = currentUser.username.charAt(0).toUpperCase();
         
-        if (currentUser.isAdmin) {
+        // ✅ KIỂM TRA ADMIN STATUS
+        if (currentUser.admin || currentUser.isAdmin) {
             usernameDisplay.innerHTML = `${currentUser.username} <span class="admin-badge">(admin)</span>`;
             userAvatar.classList.add('admin-avatar');
             adminPanel.style.display = 'block';
@@ -1464,38 +1438,6 @@ document.addEventListener('keydown', function(e) {
     }
 });
 
-// Thêm vào hàm initializePage
-function initializePage() {
-    console.log('🔄 Initializing page...');
-    
-    // Tạo admin account nếu chưa có
-    createAdminAccount();
-    
-    // Load session
-    loadSession();
-    
-    // Update UI based on login status
-    updateAuthUI();
-    
-    // Render comments ngay lập tức
-    renderComments();
-    
-    // Render updates
-    renderUpdates();
-    
-    // Setup event listeners
-    setupSmoothScroll();
-    setupFullscreenListener();
-    
-    // Thêm listener để khôi phục scroll khi load lại trang
-    window.addEventListener('load', function() {
-        if (!isFullscreen) {
-            enableScroll();
-        }
-    });
-    
-    console.log('✅ Page initialized');
-}
 // Tìm đoạn code cũ và thay thế bằng đoạn này:
 
 playBtn.addEventListener('click', () => {

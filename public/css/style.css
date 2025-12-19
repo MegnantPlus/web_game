@@ -2184,16 +2184,7 @@ body.loaded .loading-overlay {
         background: #000;
     }
     
-    /* Khi xoay ngang - giữ nguyên */
-    @media (orientation: landscape) {
-        .game-player.fullscreen {
-            /* Landscape tự nhiên, không xoay */
-        }
-        
-        #gameFrame {
-            /* Game sẽ tự điều chỉnh */
-        }
-    }
+    
     
     /* Khi xoay dọc - KHÔNG XOAY */
     @media (orientation: portrait) {
