@@ -174,41 +174,41 @@
 
 <body onload="document.body.classList.add('loaded')" class="loading">
     <!-- HEADER -->
-    <header class="header">
-        <div class="title">
-            <!-- Logo - smaller -->
-            <div class="header-logo">
-                <img src="img/ab1152a0f1cc7e9227dd.jpg" alt="FICKLEBALL CHAPTER">
-            </div>
-            
-            <!-- Menu buttons - now on the right side of logo -->
-            <ul class="header-menu">
-                <li><a href="#introduction">Introduce</a></li>
-                <li><a href="#donate">Donate</a></li>
-                <li><a href="#updatesSection">Updates</a></li>
-            </ul>
+<header class="header">
+    <div class="title">
+        <!-- Logo - smaller -->
+        <div class="header-logo">
+            <img src="img/ChatGPT Image 17_13_12 20 thg 12, 2025.png" alt="FICKLEBALL CHAPTER">
+        </div>
+        
+        <!-- Menu buttons - SIMPLE STYLE -->
+        <ul class="header-nav">
+            <li><a href="#introduction">Introduce</a></li>
+            <li><a href="#donate">Donate</a></li>
+            <li><a href="#updatesSection">Updates</a></li>
+        </ul>
+    </div>
+
+    <!-- AUTH SECTION - stays on the far right -->
+    <div class="auth-section" id="authSection">
+        <!-- Not logged in -->
+        <div class="auth-buttons" id="authButtons">
+            <button class="sign-in-button" onclick="showAuthModal('login')">Log in</button>
+            <button class="sign-up-button" onclick="showAuthModal('signup')">Sign up</button>
         </div>
 
-        <!-- AUTH SECTION - stays on the far right -->
-        <div class="auth-section" id="authSection">
-            <!-- Not logged in -->
-            <div class="auth-buttons" id="authButtons">
-                <button class="sign-in-button" onclick="showAuthModal('login')">Log in</button>
-                <button class="sign-up-button" onclick="showAuthModal('signup')">Sign up</button>
+        <!-- Logged in -->
+        <div class="user-profile" id="userProfile" style="display: none;">
+            <div class="profile-info">
+                <span class="user-avatar" id="userAvatar">👤</span>
+                <span class="username" id="usernameDisplay"></span>
             </div>
-
-            <!-- Logged in -->
-            <div class="user-profile" id="userProfile" style="display: none;">
-                <div class="profile-info">
-                    <span class="user-avatar" id="userAvatar">👤</span>
-                    <span class="username" id="usernameDisplay"></span>
-                </div>
-                <button class="logout-button" onclick="logout()">
-                    <i class="fas fa-sign-out-alt"></i>
-                </button>
-            </div>
+            <button class="logout-button" onclick="logout()">
+                <i class="fas fa-sign-out-alt"></i>
+            </button>
         </div>
-    </header>
+    </div>
+</header>
 
     <!-- ADMIN PANEL (only for admin users) -->
     <div class="admin-panel" id="adminPanel" style="display: none;">
@@ -363,22 +363,36 @@
     <div class="big-spacing"></div>
 
     <!-- DONATE SECTION -->
-    <div id="donate" style="max-width: 800px; margin: 0 auto; padding: 0 20px; color: white;">
-        <h2 style="text-align: center; margin-bottom: 30px; font-size: 2rem;">❤️ Donate</h2>
-        <div style="background: rgba(0, 0, 0, 0.3); padding: 2rem; border-radius: 10px; text-align: center;">
-            <h3 style="font-size: 1.2rem; line-height: 1.6; font-weight: normal; margin-bottom: 20px;">
-                Support our game development! Your donations help us create more amazing content.
-            </h3>
-            <div style="display: flex; justify-content: center; gap: 20px; flex-wrap: wrap;">
-                <button class="donate-btn paypal" onclick="donate('paypal')">
-                    <i class="fab fa-paypal"></i> Donate via PayPal
-                </button>
-                <button class="donate-btn patreon" onclick="donate('patreon')">
-                    <i class="fab fa-patreon"></i> Support on Patreon
-                </button>
-            </div>
+<div id="donate" style="max-width: 800px; margin: 0 auto; padding: 0 20px; color: white;">
+    <h2 style="text-align: center; margin-bottom: 30px; font-size: 2rem;">❤️ Donate</h2>
+    <div style="background: rgba(0, 0, 0, 0.3); padding: 2rem; border-radius: 10px; text-align: center;">
+        <h3 style="font-size: 1.2rem; line-height: 1.6; font-weight: normal; margin-bottom: 20px;">
+            Support our game development! Your donations help us create more amazing content.
+        </h3>
+        <div style="text-align: center;">
+            <!-- CHỈ 1 NÚT DONATE DUY NHẤT -->
+            <button class="donate-btn" onclick="showDonateForm()" 
+                    style="background: linear-gradient(135deg, #ff4757 0%, #ff3838 100%);
+                           color: whitesmoke;
+                           border: none;
+                           padding: 1.2rem 3rem;
+                           font-size: 1.4rem;
+                           font-weight: bold;
+                           border-radius: 50px;
+                           cursor: pointer;
+                           transition: all 0.3s ease;
+                           box-shadow: 0 6px 20px rgba(255, 56, 56, 0.4);
+                           display: inline-flex;
+                           align-items: center;
+                           justify-content: center;
+                           gap: 10px;
+                           text-transform: uppercase;
+                           letter-spacing: 1px;">
+                <i class="fas fa-heart"></i> DONATE
+            </button>
         </div>
     </div>
+</div>
 
     <div class="big-spacing"></div>
 

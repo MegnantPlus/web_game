@@ -1212,13 +1212,277 @@ function enableScroll() {
     window.scrollTo(0, scrollPosition);
 }
 
-// Donate function
-function donate(platform) {
-    if (platform === 'paypal') {
-        window.open('https://paypal.com', '_blank');
-    } else if (platform === 'patreon') {
-        window.open('https://patreon.com', '_blank');
+// Donate function - SINGLE BUTTON với form
+function showDonateForm() {
+    // Tạo modal donation form
+    const modalOverlay = document.createElement('div');
+    modalOverlay.className = 'donate-modal-overlay';
+    modalOverlay.style.cssText = `
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.85);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+        backdrop-filter: blur(5px);
+    `;
+
+    // Tạo modal content với form
+    const modalContent = document.createElement('div');
+    modalContent.className = 'donate-modal';
+    modalContent.style.cssText = `
+        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+        border-radius: 20px;
+        padding: 30px;
+        width: 90%;
+        max-width: 500px;
+        border: 1px solid rgba(255, 71, 87, 0.3);
+        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+        animation: modalFadeIn 0.3s ease;
+    `;
+
+    modalContent.innerHTML = `
+        <div class="modal-header" style="margin-bottom: 20px;">
+            <h2 style="color: white; display: flex; align-items: center; gap: 10px; margin: 0;">
+                <i class="fas fa-donate" style="color: #ff4757;"></i> Make a Donation
+            </h2>
+            <button class="modal-close-btn" onclick="this.closest('.donate-modal-overlay')?.remove()" style="background: rgba(255,71,87,0.1); border: 1px solid rgba(255,71,87,0.3); color: #ff4757; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; transition: all 0.3s ease;">×</button>
+        </div>
+        
+        <div class="modal-body" style="color: white;">
+            <form id="donateForm">
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; color: #aaa; margin-bottom: 8px; font-size: 0.9rem;">
+                        <i class="fas fa-user"></i> Your Name
+                    </label>
+                    <input type="text" id="donateName" placeholder="Enter your name" required
+                           style="width: 100%; padding: 12px; background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.1); border-radius: 10px; color: white; font-size: 1rem;">
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; color: #aaa; margin-bottom: 8px; font-size: 0.9rem;">
+                        <i class="fas fa-envelope"></i> Email Address
+                    </label>
+                    <input type="email" id="donateEmail" placeholder="Enter your email" required
+                           style="width: 100%; padding: 12px; background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.1); border-radius: 10px; color: white; font-size: 1rem;">
+                </div>
+                
+                <div style="margin-bottom: 25px;">
+                    <label style="display: block; color: #aaa; margin-bottom: 8px; font-size: 0.9rem;">
+                        <i class="fas fa-money-bill-wave"></i> Donation Amount ($)
+                    </label>
+                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <button type="button" class="amount-btn" data-amount="5" onclick="setAmount(5)">$5</button>
+                        <button type="button" class="amount-btn" data-amount="10" onclick="setAmount(10)">$10</button>
+                        <button type="button" class="amount-btn" data-amount="20" onclick="setAmount(20)">$20</button>
+                        <button type="button" class="amount-btn" data-amount="50" onclick="setAmount(50)">$50</button>
+                        <button type="button" class="amount-btn" data-amount="100" onclick="setAmount(100)">$100</button>
+                    </div>
+                    <div style="margin-top: 10px;">
+                        <input type="number" id="donateAmount" placeholder="Custom amount" min="1" step="0.01" required
+                               style="width: 100%; padding: 12px; background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.1); border-radius: 10px; color: white; font-size: 1rem;">
+                    </div>
+                </div>
+                
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; color: #aaa; margin-bottom: 8px; font-size: 0.9rem;">
+                        <i class="fas fa-comment"></i> Message (Optional)
+                    </label>
+                    <textarea id="donateMessage" placeholder="Add a message..." rows="3"
+                              style="width: 100%; padding: 12px; background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.1); border-radius: 10px; color: white; font-size: 1rem; resize: vertical;"></textarea>
+                </div>
+                
+                <button type="button" onclick="submitDonation()" 
+                        style="width: 100%; background: linear-gradient(135deg, #4CAF50, #45a049); color: white; border: none; padding: 15px; border-radius: 10px; font-size: 1.1rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.3s ease;">
+                    <i class="fas fa-paper-plane"></i> Proceed to Payment
+                </button>
+                
+                <div style="margin-top: 15px; color: #666; font-size: 0.85rem; text-align: center;">
+                    <i class="fas fa-lock"></i> Secure payment processing
+                </div>
+            </form>
+            
+            <!-- QR Code Display Area (sẽ hiển thị sau khi submit) -->
+            <div id="qrCodeContainer" style="display: none; margin-top: 25px; text-align: center;">
+                <h3 style="color: white; margin-bottom: 15px;">Scan QR Code to Complete Donation</h3>
+                <div id="qrCodeImage" style="background: white; padding: 20px; border-radius: 10px; display: inline-block;">
+                    <!-- QR code sẽ được hiển thị ở đây -->
+                </div>
+                <div style="margin-top: 15px; color: #aaa; font-size: 0.9rem;">
+                    <p>Bank Account: <strong>123-456-789</strong></p>
+                    <p>Account Holder: <strong>GAME DEVELOPMENT</strong></p>
+                </div>
+            </div>
+        </div>
+    `;
+
+    modalOverlay.appendChild(modalContent);
+    document.body.appendChild(modalOverlay);
+
+    // Thêm CSS styles
+    const style = document.createElement('style');
+    style.textContent = `
+        .amount-btn {
+            flex: 1;
+            min-width: 60px;
+            padding: 10px;
+            background: rgba(33, 150, 243, 0.1);
+            border: 1px solid rgba(33, 150, 243, 0.3);
+            color: #2196F3;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: bold;
+        }
+        
+        .amount-btn:hover {
+            background: rgba(33, 150, 243, 0.2);
+            transform: translateY(-2px);
+        }
+        
+        .amount-btn.active {
+            background: #2196F3;
+            color: white;
+            border-color: #2196F3;
+        }
+        
+        button[type="button"]:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        @keyframes modalFadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #2196F3 !important;
+            background: rgba(33, 150, 243, 0.1) !important;
+        }
+    `;
+    
+    modalOverlay.appendChild(style);
+
+    // Đóng modal khi click ra ngoài
+    modalOverlay.addEventListener('click', function(e) {
+        if (e.target === modalOverlay) {
+            modalOverlay.remove();
+        }
+    });
+}
+
+// Set amount khi click nút
+function setAmount(amount) {
+    document.getElementById('donateAmount').value = amount;
+    
+    // Highlight nút được chọn
+    document.querySelectorAll('.amount-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (parseInt(btn.dataset.amount) === amount) {
+            btn.classList.add('active');
+        }
+    });
+}
+
+// Submit donation form
+function submitDonation() {
+    const name = document.getElementById('donateName').value.trim();
+    const email = document.getElementById('donateEmail').value.trim();
+    const amount = document.getElementById('donateAmount').value;
+    const message = document.getElementById('donateMessage').value.trim();
+    
+    // Validate
+    if (!name || !email || !amount) {
+        showNotification('Please fill in all required fields', 'error');
+        return;
     }
+    
+    if (parseFloat(amount) <= 0) {
+        showNotification('Please enter a valid donation amount', 'error');
+        return;
+    }
+    
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+        showNotification('Please enter a valid email address', 'error');
+        return;
+    }
+    
+    // Tạo donation data
+    const donationData = {
+        name: name,
+        email: email,
+        amount: parseFloat(amount),
+        message: message,
+        timestamp: Date.now()
+    };
+    
+    console.log('Submitting donation:', donationData);
+    
+    // Ở ĐÂY SẼ GỬI ĐẾN BACKEND API
+    // axios.post('/api/donate', donationData)
+    //     .then(response => {
+    //         // Hiển thị QR code từ backend
+    //         showQRCode(response.data.qrCode);
+    //     })
+    //     .catch(error => {
+    //         showNotification('Payment failed. Please try again.', 'error');
+    //     });
+    
+    // Tạm thời hiển thị QR mẫu (DEMO)
+    showQRCodeDemo(donationData);
+}
+
+// Hiển thị QR code (DEMO)
+function showQRCodeDemo(donationData) {
+    const qrContainer = document.getElementById('qrCodeContainer');
+    const form = document.getElementById('donateForm');
+    
+    if (qrContainer && form) {
+        // Ẩn form, hiện QR
+        form.style.display = 'none';
+        qrContainer.style.display = 'block';
+        
+        // Tạo QR code demo (thực tế sẽ lấy từ backend)
+        const qrContent = `
+            <div style="text-align: center; padding: 20px;">
+                <div style="background: white; width: 200px; height: 200px; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; border-radius: 10px;">
+                    <div style="color: black; font-size: 1rem;">
+                        <div style="font-weight: bold; margin-bottom: 10px;">QR CODE</div>
+                        <div>Amount: $${donationData.amount}</div>
+                        <div>From: ${donationData.name}</div>
+                    </div>
+                </div>
+                <div style="color: white; margin-top: 15px;">
+                    <p><i class="fas fa-info-circle"></i> Scan this code with your banking app</p>
+                    <p><small>Donation ID: ${Date.now().toString(36).toUpperCase()}</small></p>
+                </div>
+            </div>
+        `;
+        
+        document.getElementById('qrCodeImage').innerHTML = qrContent;
+        
+        // Lưu donation vào localStorage (tạm thời)
+        saveDonationToHistory(donationData);
+    }
+}
+
+// Lưu donation vào history (tạm thời)
+function saveDonationToHistory(donationData) {
+    const donations = JSON.parse(localStorage.getItem('pickleball_donations') || '[]');
+    donations.push({
+        ...donationData,
+        id: Date.now(),
+        status: 'pending'
+    });
+    localStorage.setItem('pickleball_donations', JSON.stringify(donations));
 }
 
 // Utility functions
