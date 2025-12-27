@@ -95,61 +95,50 @@ function closeUpdateForm() {
     }
 }
 
-function submitUpdate() {
+// ============ UPDATES ============
+async function loadUpdates() {
+    try {
+        const result = await window.userSystem.getUpdates();
+        if (result.success) {
+            window.updatesData = result.data || [];
+            renderUpdates();
+        } else {
+            window.updatesData = [];
+            renderUpdates();
+        }
+    } catch (error) {
+        console.error('Failed to load updates:', error);
+        window.updatesData = [];
+        renderUpdates();
+    }
+}
+
+async function submitUpdate() {
     const title = document.getElementById('updateTitle').value.trim();
     const content = document.getElementById('updateContent').value.trim();
     
-    if (!title) {
-        showCustomAlert('Error', 'Please enter a title for the update!', 'error');
-        document.getElementById('updateTitle').focus();
+    if (!title || !content) {
+        showNotification('Please fill in all fields', 'error');
         return;
     }
     
-    if (!content) {
-        showCustomAlert('Error', 'Please enter content for the update!', 'error');
-        document.getElementById('updateContent').focus();
+    if (!window.userSystem.isAdmin()) {
+        showNotification('Admin access required', 'error');
         return;
     }
     
-    if (title.length < 3) {
-        showCustomAlert('Error', 'Title must be at least 3 characters!', 'error');
-        return;
+    try {
+        const result = await window.userSystem.createUpdate(title, content);
+        if (result.success) {
+            closeUpdateForm();
+            await loadUpdates();
+            showNotification('Update created!', 'success');
+        } else {
+            showNotification(result.error || 'Failed to create update', 'error');
+        }
+    } catch (error) {
+        showNotification('Failed to create update', 'error');
     }
-    
-    // Get current user
-    const sessionUsername = localStorage.getItem('pickleball_session');
-    if (!sessionUsername) {
-        showCustomAlert('Error', 'You must be logged in to add updates!', 'error');
-        return;
-    }
-    
-    // Add update
-    let updates = JSON.parse(localStorage.getItem('pickleball_updates') || '[]');
-    const newUpdate = {
-        id: Date.now(),
-        title: title,
-        content: content,
-        author: sessionUsername,
-        createdAt: Date.now(),
-        isVisible: true
-    };
-    
-    updates.unshift(newUpdate);
-    localStorage.setItem('pickleball_updates', JSON.stringify(updates));
-    
-    closeUpdateForm();
-    
-    // Refresh updates display
-    if (typeof renderUpdates === 'function') {
-        renderUpdates();
-    }
-    
-    // Refresh admin panel if open
-    if (typeof loadAdminUpdatesList === 'function') {
-        loadAdminUpdatesList();
-    }
-    
-    showCustomAlert('Success', 'Update added successfully!', 'success');
 }
 
 // Make functions available globally
@@ -422,50 +411,29 @@ function showEditUpdateForm(updateId) {
     console.log('DEBUG: Modal created successfully');
 }
 
-function submitEditUpdate(updateId) {
-    console.log('DEBUG: submitEditUpdate called with ID:', updateId);
-    
+async function submitEditUpdate(updateId) {
     const title = document.getElementById('editUpdateTitle').value.trim();
     const content = document.getElementById('editUpdateContent').value.trim();
     
-    // Kiểm tra đầu vào
-    if (!title) {
-        showCustomAlert('Error', 'Please enter a title for the update!', 'error');
-        document.getElementById('editUpdateTitle').focus();
+    if (!title || !content) {
+        showNotification('Please fill in all fields', 'error');
         return;
     }
     
-    if (!content) {
-        showCustomAlert('Error', 'Please enter content for the update!', 'error');
-        document.getElementById('editUpdateContent').focus();
-        return;
-    }
-    
-    if (title.length < 3) {
-        showCustomAlert('Error', 'Title must be at least 3 characters!', 'error');
-        return;
-    }
-    
-    console.log('DEBUG: Calling editUpdate with:', { updateId, title, content });
-    
-    // Gọi hàm editUpdate từ userSystem
-    const result = userSystem.editUpdate(updateId, title, content);
-    console.log('DEBUG: editUpdate result:', result);
-    
-    if (result) {
-        closeCustomModal('editUpdateFormModal');
-        
-        // Refresh các phần liên quan
-        if (window.loadAdminUpdatesList) loadAdminUpdatesList();
-        if (window.showUpdatesSection) showUpdatesSection();
-        if (window.updateAdminStats) updateAdminStats();
-        if (window.initializeUpdateSlider) initializeUpdateSlider();
-        
-        showCustomAlert('Success', 'Update edited successfully!', 'success');
-    } else {
-        showCustomAlert('Error', 'Failed to edit update. You may not have permission.', 'error');
+    try {
+        const result = await window.userSystem.editUpdate(updateId, title, content);
+        if (result.success) {
+            closeCustomModal('editUpdateFormModal');
+            await loadUpdates();
+            showNotification('Update updated!', 'success');
+        } else {
+            showNotification(result.error || 'Failed to update', 'error');
+        }
+    } catch (error) {
+        showNotification('Failed to update', 'error');
     }
 }
+
 
 // ============ CUSTOM DELETE CONFIRMATIONS ============
 function confirmDeleteUpdate(updateId) {

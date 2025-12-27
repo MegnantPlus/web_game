@@ -2492,3 +2492,116 @@ body.no-scroll {
     height: 100% !important;
     border: none;
 }
+/* Error highlighting for donation form */
+.donate-error {
+    color: #ff4757;
+    font-size: 0.85rem;
+    margin-top: 5px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.donate-error i {
+    font-size: 0.8rem;
+}
+
+input.error-border {
+    border-color: #ff4757 !important;
+    background: rgba(255, 71, 87, 0.1) !important;
+}
+
+/* Success state */
+.donate-success {
+    color: #4CAF50;
+    font-size: 0.85rem;
+    margin-top: 5px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+/* Amount validation */
+.amount-validation {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 5px;
+    font-size: 0.8rem;
+}
+
+.amount-min {
+    color: #ff9800;
+}
+
+.amount-max {
+    color: #2196F3;
+}
+/* Donation Modal Responsive Styles */
+.donate-modal-overlay {
+    overscroll-behavior: contain; /* Prevent page scroll when modal is open */
+}
+
+@media (max-height: 600px) {
+    .donate-modal {
+        max-height: 95vh !important;
+        margin: 10px auto !important;
+    }
+    
+    .modal-body {
+        max-height: calc(95vh - 60px) !important;
+        padding: 0 15px 15px !important;
+    }
+    
+    textarea#donateMessage {
+        rows: 1 !important;
+        min-height: 50px !important;
+        max-height: 80px !important;
+    }
+}
+
+/* For very small screens */
+@media (max-width: 360px) {
+    .amount-btn {
+        font-size: 0.8rem !important;
+        padding: 5px !important;
+    }
+    
+    input, textarea {
+        font-size: 0.9rem !important;
+        padding: 8px !important;
+    }
+    
+    button[type="button"] {
+        font-size: 0.95rem !important;
+        padding: 10px !important;
+    }
+}
+
+/* Landscape mode on mobile */
+@media (max-height: 500px) and (orientation: landscape) {
+    .donate-modal {
+        max-width: 90% !important;
+        max-height: 95vh !important;
+    }
+    
+    .modal-body {
+        display: grid !important;
+        grid-template-columns: 1fr 1fr !important;
+        gap: 15px !important;
+        align-items: start !important;
+    }
+    
+    #donateForm {
+        grid-column: 1;
+    }
+    
+    #qrCodeContainer {
+        grid-column: 2;
+        margin-top: 0 !important;
+        display: none; /* Hidden by default */
+    }
+    
+    #qrCodeContainer[style*="display: block"] {
+        display: block !important;
+    }
+}

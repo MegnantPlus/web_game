@@ -1,92 +1,50 @@
-// main.js - Main Application File
-let showCommentsToPublic = true;
-let isFullscreen = false;
+// main.js - Main Application File (UPDATED FOR API INTEGRATION)
+// ============ GLOBAL STATE ============
 let currentUser = null;
+let isFullscreen = false;
 let isShowingAllUpdates = false;
 let currentUpdateIndex = 0;
-let currentPreviewIndex = 0; // Thêm dòng này
+let currentPreviewIndex = 0;
+let scrollPosition = 0;
 
-// SIMPLE HASH FUNCTION - CHẠY CHÍNH XÁC
-function simpleHash(password) {
-    let hash = 5381;
-    for (let i = 0; i < password.length; i++) {
-        hash = (hash * 33) ^ password.charCodeAt(i);
-    }
-    return (hash >>> 0).toString(36);
-}
-
-// Initialize everything
-function initializePage() {
+// ============ INITIALIZATION ============
+async function initializePage() {
     console.log('🔄 Initializing page...');
     
-    // Load session
-    loadSession();
+    // Load session từ token
+    if (window.userSystem && window.userSystem.isLoggedIn()) {
+        currentUser = window.userSystem.getUser();
+        console.log('✅ User loaded from token:', currentUser?.username);
+    }
     
-    // Update UI based on login status
+    // Update UI
     updateAuthUI();
     
-    // Render comments ngay lập tức
-    renderComments();
+    // Load data từ API
+    await loadComments();
+    await loadUpdates();
     
-    // Render updates
-    renderUpdates();
-    
-    // Setup event listeners
+    // Setup event listeners (giữ nguyên)
     setupSmoothScroll();
     setupFullscreenListener();
-    setupOrientationListener(); // Thêm dòng này
-    
-    // Thêm listener để khôi phục scroll khi load lại trang
-    window.addEventListener('load', function() {
-        if (!isFullscreen) {
-            enableScroll();
-        }
-    });
+    setupOrientationListener();
     
     console.log('✅ Page initialized');
 }
 
-// Session management
-function loadSession() {
-    const sessionUsername = localStorage.getItem('pickleball_session');
-    if (sessionUsername) {
-        const users = JSON.parse(localStorage.getItem('pickleball_users') || '[]');
-        const user = users.find(u => u.username === sessionUsername);
-        
-        if (user) {
-            // Kiểm tra xem user có bị banned không
-            const bannedUsers = JSON.parse(localStorage.getItem('pickleball_banned') || '[]');
-            if (!bannedUsers.includes(sessionUsername) && !user.isBanned) {
-                currentUser = user;
-                console.log('✅ User logged in:', currentUser.username, currentUser.email);
-            } else {
-                // Nếu bị banned, xóa session
-                localStorage.removeItem('pickleball_session');
-                currentUser = null;
-                console.log('❌ User is banned');
-            }
-        } else {
-            // Nếu user không tồn tại trong database
-            localStorage.removeItem('pickleball_session');
-            currentUser = null;
-        }
-    }
-    console.log('Current user after load:', currentUser);
-}
-
+// ============ SESSION MANAGEMENT ============
 function saveSession() {
     if (currentUser) {
         localStorage.setItem('pickleball_session', currentUser.username);
     }
 }
 
-// Auth functions
+// ============ AUTH MODAL FUNCTIONS (GIỮ NGUYÊN) ============
 function showAuthModal(mode = 'login') {
     const modal = document.getElementById('authModal');
     const title = document.getElementById('modalTitle');
     const submitBtn = document.getElementById('authSubmitBtn');
     const switchText = document.getElementById('authSwitch');
-    const authForm = document.querySelector('.auth-form');
     
     document.getElementById('authError').textContent = '';
     document.getElementById('authEmail').value = '';
@@ -95,7 +53,7 @@ function showAuthModal(mode = 'login') {
         document.getElementById('authUsername').value = '';
     }
     
-    // Hiển thị/ẩn trường username dựa trên mode
+    // Hiển thị/ẩn trường username
     const usernameField = document.getElementById('usernameField');
     if (usernameField) {
         usernameField.style.display = mode === 'signup' ? 'block' : 'none';
@@ -116,8 +74,6 @@ function showAuthModal(mode = 'login') {
 
 function closeAuthModal() {
     document.getElementById('authModal').style.display = 'none';
-    
-    // Reset error state
     document.getElementById('authError').textContent = '';
     document.querySelectorAll('.auth-form input').forEach(input => {
         input.classList.remove('error');
@@ -129,125 +85,62 @@ function toggleAuthMode() {
     showAuthModal(currentMode === 'login' ? 'signup' : 'login');
 }
 
-function handleAuthSubmit() {
+// ============ AUTHENTICATION (UPDATED FOR API) ============
+async function handleAuthSubmit() {
     const isSignupMode = document.getElementById('modalTitle').textContent.includes('Sign up');
     const errorElement = document.getElementById('authError');
+    errorElement.textContent = '';
     
-    // Xóa class error cũ
-    document.querySelectorAll('.auth-form input').forEach(input => {
-        input.classList.remove('error');
-    });
-    
-    if (isSignupMode) {
-        // SIGN UP - 3 trường
-        const username = document.getElementById('authUsername').value.trim();
-        const email = document.getElementById('authEmail').value.trim();
-        const password = document.getElementById('authPassword').value;
-        
-        if (!username || !email || !password) {
-            errorElement.textContent = 'Please fill in all fields';
-            // Thêm class error cho input trống
-            if (!username) document.getElementById('authUsername').classList.add('error');
-            if (!email) document.getElementById('authEmail').classList.add('error');
-            if (!password) document.getElementById('authPassword').classList.add('error');
-            return;
+    try {
+        if (isSignupMode) {
+            // SIGN UP với API
+            const username = document.getElementById('authUsername').value.trim();
+            const email = document.getElementById('authEmail').value.trim();
+            const password = document.getElementById('authPassword').value;
+            
+            if (!username || !email || !password) {
+                errorElement.textContent = 'Please fill in all fields';
+                return;
+            }
+            
+            const result = await window.userSystem.register(username, email, password);
+            
+            if (result.success) {
+                currentUser = result.user;
+                closeAuthModal();
+                updateAuthUI();
+                await loadComments();
+                await loadUpdates();
+                showNotification('Account created successfully!', 'success');
+            } else {
+                errorElement.textContent = result.error || 'Registration failed';
+            }
+        } else {
+            // LOGIN với API
+            const email = document.getElementById('authEmail').value.trim();
+            const password = document.getElementById('authPassword').value;
+            
+            if (!email || !password) {
+                errorElement.textContent = 'Please fill in all fields';
+                return;
+            }
+            
+            const result = await window.userSystem.login(email, password);
+            
+            if (result.success) {
+                currentUser = result.user;
+                closeAuthModal();
+                updateAuthUI();
+                await loadComments();
+                await loadUpdates();
+                showNotification('Logged in successfully!', 'success');
+            } else {
+                errorElement.textContent = result.error || 'Login failed';
+            }
         }
-        
-        // Validate email
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-            errorElement.textContent = 'Please enter a valid email address';
-            document.getElementById('authEmail').classList.add('error');
-            return;
-        }
-        
-        // Get users from localStorage
-        let users = JSON.parse(localStorage.getItem('pickleball_users') || '[]');
-        
-        // Check if username exists
-        if (users.find(u => u.username.toLowerCase() === username.toLowerCase())) {
-            errorElement.textContent = 'Username already exists';
-            document.getElementById('authUsername').classList.add('error');
-            return;
-        }
-        
-        // Check if email exists
-        if (users.find(u => u.email && u.email.toLowerCase() === email.toLowerCase())) {
-            errorElement.textContent = 'Email already registered';
-            document.getElementById('authEmail').classList.add('error');
-            return;
-        }
-        
-        if (username.length < 3 || username.length > 20) {
-            errorElement.textContent = 'Username must be 3-20 characters';
-            document.getElementById('authUsername').classList.add('error');
-            return;
-        }
-        
-        // ĐỔI TỪ 6 KÍ TỰ THÀNH 8 KÍ TỰ
-        if (password.length < 8) {
-            errorElement.textContent = 'Password must be at least 8 characters';
-            document.getElementById('authPassword').classList.add('error');
-            return;
-        }
-        
-        // ... phần còn lại của sign up ...
-        
-    } else {
-        // LOGIN - 2 trường
-        const email = document.getElementById('authEmail').value.trim();
-        const password = document.getElementById('authPassword').value;
-        
-        if (!email || !password) {
-            errorElement.textContent = 'Please fill in all fields';
-            // Thêm class error cho input trống
-            if (!email) document.getElementById('authEmail').classList.add('error');
-            if (!password) document.getElementById('authPassword').classList.add('error');
-            return;
-        }
-        
-        // Validate email
-        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        if (!emailRegex.test(email)) {
-            errorElement.textContent = 'Please enter a valid email address';
-            document.getElementById('authEmail').classList.add('error');
-            return;
-        }
-        
-        // Get users from localStorage
-        let users = JSON.parse(localStorage.getItem('pickleball_users') || '[]');
-        
-        // Tìm user bằng email
-        const user = users.find(u => u.email && u.email.toLowerCase() === email.toLowerCase());
-        
-        if (!user) {
-            errorElement.textContent = 'Invalid email or password';
-            document.getElementById('authEmail').classList.add('error');
-            document.getElementById('authPassword').classList.add('error');
-            return;
-        }
-        
-        const hashedPassword = simpleHash(password);
-        
-        if (user.password !== hashedPassword) {
-            errorElement.textContent = 'Invalid email or password';
-            document.getElementById('authEmail').classList.add('error');
-            document.getElementById('authPassword').classList.add('error');
-            return;
-        }
-        
-        if (user.isBanned) {
-            errorElement.textContent = 'This account has been banned!';
-            return;
-        }
-        
-        // Success
-        currentUser = user;
-        saveSession();
-        closeAuthModal();
-        updateAuthUI();
-        renderUpdates();
-        showNotification('Logged in successfully!', 'success');
+    } catch (error) {
+        errorElement.textContent = 'An error occurred. Please try again.';
+        console.error('Auth error:', error);
     }
 }
 
@@ -257,6 +150,8 @@ function updateAuthUI() {
     const usernameDisplay = document.getElementById('usernameDisplay');
     const userAvatar = document.getElementById('userAvatar');
     const adminPanel = document.getElementById('adminPanel');
+    const loginToComment = document.getElementById('loginToComment');
+    const commentInputSection = document.getElementById('commentInputSection');
     
     if (currentUser) {
         authButtons.style.display = 'none';
@@ -264,8 +159,8 @@ function updateAuthUI() {
         usernameDisplay.textContent = currentUser.username;
         userAvatar.textContent = currentUser.username.charAt(0).toUpperCase();
         
-        // ✅ KIỂM TRA ADMIN STATUS
-        if (currentUser.admin || currentUser.isAdmin) {
+        // Kiểm tra admin status
+        if (currentUser.isAdmin || currentUser.admin) {
             usernameDisplay.innerHTML = `${currentUser.username} <span class="admin-badge">(admin)</span>`;
             userAvatar.classList.add('admin-avatar');
             adminPanel.style.display = 'block';
@@ -282,41 +177,57 @@ function updateAuthUI() {
         userProfile.style.display = 'none';
         adminPanel.style.display = 'none';
         
-        // Show login prompt for comments
+        // Show login prompt
         if (loginToComment) loginToComment.style.display = 'block';
         if (commentInputSection) commentInputSection.style.display = 'none';
     }
     
-    // Luôn render lại comments để cập nhật UI
+    // Render lại để cập nhật UI
     renderComments();
     renderUpdates();
 }
 
-function logout() {
+async function logout() {
     showCustomConfirm(
         'Logout',
         'Are you sure you want to logout?',
-        () => {
+        async () => {
+            await window.userSystem.logout();
             currentUser = null;
-            localStorage.removeItem('pickleball_session');
             updateAuthUI();
-            renderComments();
-            renderUpdates();
+            await loadComments();
+            await loadUpdates();
             showNotification('Logged out successfully!', 'success');
         }
     );
 }
 
-// Comments functions
-window.commentsData = JSON.parse(localStorage.getItem('pickleball_comments') || '[]');
+// ============ COMMENTS SYSTEM (UPDATED FOR API) ============
+window.commentsData = []; // Khởi tạo rỗng, sẽ load từ API
+
+async function loadComments() {
+    try {
+        const result = await window.userSystem.getComments();
+        if (result.success && result.data) {
+            window.commentsData = result.data;
+        } else {
+            window.commentsData = [];
+        }
+        renderComments();
+    } catch (error) {
+        console.error('Failed to load comments:', error);
+        window.commentsData = [];
+        renderComments();
+    }
+}
 
 function renderComments() {
     const commentsList = document.getElementById('commentsList');
     if (!commentsList) return;
     
-    console.log('Rendering comments...', window.commentsData.length, 'comments');
+    console.log('Rendering comments...', window.commentsData?.length || 0, 'comments');
     
-    if (window.commentsData.length === 0) {
+    if (!window.commentsData || window.commentsData.length === 0) {
         commentsList.innerHTML = `
             <div class="no-comments">
                 <i class="fas fa-comment-slash"></i>
@@ -328,7 +239,7 @@ function renderComments() {
         return;
     }
     
-    // HIỂN THỊ COMMENT CHO TẤT CẢ MỌI NGƯỜI
+    // Render comments từ API data
     commentsList.innerHTML = window.commentsData.map(comment => 
         createCommentHTML(comment)
     ).join('');
@@ -342,59 +253,32 @@ function renderComments() {
 }
 
 function createCommentHTML(comment) {
-    const isCurrentUser = currentUser && comment.author === currentUser.username;
+    const isCurrentUser = currentUser && comment.user && 
+                         (comment.user.username === currentUser.username || 
+                          comment.user._id === currentUser._id);
+    const username = comment.user?.username || 'Unknown';
     
-    // Get user's vote
-    let userVote = null;
-    if (currentUser && comment.votes) {
-        userVote = comment.votes[currentUser.username];
-    }
-    
-    const voteNumberClass = comment.voteScore > 0 ? 'positive' : 
-                           comment.voteScore < 0 ? 'negative' : '';
-    
-    // LUÔN HIỂN THỊ NỘI DUNG COMMENT, CHỈ ẨN NÚT HÀNH ĐỘNG NẾU CHƯA LOGIN
+    // LUÔN HIỂN THỊ NỘI DUNG COMMENT CHO TẤT CẢ
     return `
-        <div class="comment-item" data-id="${comment.id}">
+        <div class="comment-item" data-id="${comment._id}">
             <div class="comment-main">
-                <div class="comment-votes">
-                    <div class="vote-system">
-                        ${currentUser ? `
-                            <button class="vote-btn vote-up ${userVote === 'up' ? 'active' : ''}" 
-                                    onclick="handleVote(${comment.id}, 'up')">
-                                <i class="fas fa-chevron-up"></i>
-                            </button>
-                            <span class="vote-number ${voteNumberClass}">${comment.voteScore || 0}</span>
-                            <button class="vote-btn vote-down ${userVote === 'down' ? 'active' : ''}" 
-                                    onclick="handleVote(${comment.id}, 'down')">
-                                <i class="fas fa-chevron-down"></i>
-                            </button>
-                        ` : `
-                            <div style="text-align: center;">
-                                <span class="vote-number ${voteNumberClass}">${comment.voteScore || 0}</span>
-                                <div style="font-size: 0.7rem; color: #888; margin-top: 2px;">votes</div>
-                            </div>
-                        `}
-                    </div>
-                </div>
-                
                 <div class="comment-content-wrapper">
                     <div class="comment-header">
-                        <div class="comment-avatar ${comment.author === 'Dmaster' ? 'admin-avatar' : ''}">
-                            ${comment.author.charAt(0).toUpperCase()}
+                        <div class="comment-avatar ${username === 'Dmaster' ? 'admin-avatar' : ''}">
+                            ${username.charAt(0).toUpperCase()}
                         </div>
                         <div class="comment-info">
                             <span class="comment-author">
-                                ${comment.author}
-                                ${comment.author === 'Dmaster' ? '<span class="admin-badge">(admin)</span>' : ''}
+                                ${username}
+                                ${username === 'Dmaster' ? '<span class="admin-badge">(admin)</span>' : ''}
                             </span>
                             <span class="comment-time">
-                                ${formatTimeAgo(comment.timestamp)}
+                                ${formatTimeAgo(new Date(comment.createdAt).getTime())}
                             </span>
                             ${isCurrentUser ? '<span class="comment-owner">(You)</span>' : ''}
                         </div>
                         ${isCurrentUser || (currentUser && currentUser.isAdmin) ? `
-                            <button class="delete-btn" onclick="deleteComment(${comment.id})">
+                            <button class="delete-btn" onclick="deleteComment('${comment._id}')">
                                 <i class="fas fa-trash"></i>
                             </button>
                         ` : ''}
@@ -402,18 +286,18 @@ function createCommentHTML(comment) {
                     
                     <div class="comment-content">${escapeHtml(comment.content)}</div>
                     
-                    ${currentUser ? `
+                    ${currentUser && comment.depth < 2 ? `
                         <div class="comment-actions">
-                            <button class="reply-btn" onclick="toggleReplyForm(${comment.id})">
+                            <button class="reply-btn" onclick="toggleReplyForm('${comment._id}')">
                                 <i class="fas fa-reply"></i> Reply
                             </button>
                         </div>
                         
-                        <div class="reply-form hidden" id="replyForm-${comment.id}">
+                        <div class="reply-form hidden" id="replyForm-${comment._id}">
                             <textarea class="reply-input" placeholder="Write a reply..."></textarea>
                             <div class="reply-form-actions">
-                                <button class="cancel-btn" onclick="cancelReply(${comment.id})">Cancel</button>
-                                <button class="submit-btn" onclick="submitReply(${comment.id})">Reply</button>
+                                <button class="cancel-btn" onclick="cancelReply('${comment._id}')">Cancel</button>
+                                <button class="submit-btn" onclick="submitReply('${comment._id}')">Reply</button>
                             </div>
                         </div>
                     ` : ''}
@@ -430,57 +314,31 @@ function createCommentHTML(comment) {
 }
 
 function createReplyHTML(reply) {
-    const isCurrentUser = currentUser && reply.author === currentUser.username;
-    let userVote = null;
-    if (currentUser && reply.votes) {
-        userVote = reply.votes[currentUser.username];
-    }
+    const isCurrentUser = currentUser && reply.user && 
+                         (reply.user.username === currentUser.username || 
+                          reply.user._id === currentUser._id);
+    const username = reply.user?.username || 'Unknown';
     
-    const voteNumberClass = reply.voteScore > 0 ? 'positive' : 
-                           reply.voteScore < 0 ? 'negative' : '';
-    
-    // LUÔN HIỂN THỊ REPLY CHO MỌI NGƯỜI
     return `
-        <div class="comment-item reply-item" data-id="${reply.id}">
+        <div class="comment-item reply-item" data-id="${reply._id}">
             <div class="comment-main">
-                <div class="comment-votes">
-                    <div class="vote-system">
-                        ${currentUser ? `
-                            <button class="vote-btn vote-up ${userVote === 'up' ? 'active' : ''}" 
-                                    onclick="handleVote(${reply.id}, 'up')">
-                                <i class="fas fa-chevron-up"></i>
-                            </button>
-                            <span class="vote-number ${voteNumberClass}">${reply.voteScore || 0}</span>
-                            <button class="vote-btn vote-down ${userVote === 'down' ? 'active' : ''}" 
-                                    onclick="handleVote(${reply.id}, 'down')">
-                                <i class="fas fa-chevron-down"></i>
-                            </button>
-                        ` : `
-                            <div style="text-align: center;">
-                                <span class="vote-number ${voteNumberClass}">${reply.voteScore || 0}</span>
-                                <div style="font-size: 0.7rem; color: #888; margin-top: 2px;">votes</div>
-                            </div>
-                        `}
-                    </div>
-                </div>
-                
                 <div class="comment-content-wrapper">
                     <div class="comment-header">
-                        <div class="comment-avatar ${reply.author === 'Dmaster' ? 'admin-avatar' : ''}">
-                            ${reply.author.charAt(0).toUpperCase()}
+                        <div class="comment-avatar ${username === 'Dmaster' ? 'admin-avatar' : ''}">
+                            ${username.charAt(0).toUpperCase()}
                         </div>
                         <div class="comment-info">
                             <span class="comment-author">
-                                ${reply.author}
-                                ${reply.author === 'Dmaster' ? '<span class="admin-badge">(admin)</span>' : ''}
+                                ${username}
+                                ${username === 'Dmaster' ? '<span class="admin-badge">(admin)</span>' : ''}
                             </span>
                             <span class="comment-time">
-                                ${formatTimeAgo(reply.timestamp)}
+                                ${formatTimeAgo(new Date(reply.createdAt).getTime())}
                             </span>
                             ${isCurrentUser ? '<span class="comment-owner">(You)</span>' : ''}
                         </div>
                         ${isCurrentUser || (currentUser && currentUser.isAdmin) ? `
-                            <button class="delete-btn" onclick="deleteComment(${reply.id})">
+                            <button class="delete-btn" onclick="deleteComment('${reply._id}')">
                                 <i class="fas fa-trash"></i>
                             </button>
                         ` : ''}
@@ -493,7 +351,7 @@ function createReplyHTML(reply) {
     `;
 }
 
-function submitComment() {
+async function submitComment() {
     const input = document.getElementById('commentInput');
     const content = input.value.trim();
     
@@ -507,25 +365,21 @@ function submitComment() {
         return;
     }
     
-    const newComment = {
-        id: Date.now(),
-        author: currentUser.username,
-        content: content,
-        timestamp: Date.now(),
-        voteScore: 0,
-        votes: {},
-        replies: []
-    };
-    
-    window.commentsData.unshift(newComment);
-    localStorage.setItem('pickleball_comments', JSON.stringify(window.commentsData));
-    
-    input.value = '';
-    renderComments();
-    showNotification('Comment added!', 'success');
+    try {
+        const result = await window.userSystem.postComment(content);
+        if (result.success) {
+            input.value = '';
+            await loadComments();
+            showNotification('Comment added!', 'success');
+        } else {
+            showNotification(result.error || 'Failed to add comment', 'error');
+        }
+    } catch (error) {
+        showNotification('Failed to add comment', 'error');
+    }
 }
 
-function submitReply(commentId) {
+async function submitReply(commentId) {
     const form = document.getElementById(`replyForm-${commentId}`);
     if (!form) return;
     
@@ -542,130 +396,44 @@ function submitReply(commentId) {
         return;
     }
     
-    const parentComment = window.commentsData.find(c => c.id === commentId);
-    if (!parentComment) return;
-    
-    if (!parentComment.replies) parentComment.replies = [];
-    
-    const newReply = {
-        id: Date.now(),
-        author: currentUser.username,
-        content: content,
-        timestamp: Date.now(),
-        voteScore: 0,
-        votes: {}
-    };
-    
-    parentComment.replies.unshift(newReply);
-    localStorage.setItem('pickleball_comments', JSON.stringify(window.commentsData));
-    
-    textarea.value = '';
-    form.classList.add('hidden');
-    renderComments();
-    showNotification('Reply added!', 'success');
+    try {
+        const result = await window.userSystem.postComment(content, commentId);
+        if (result.success) {
+            textarea.value = '';
+            form.classList.add('hidden');
+            await loadComments();
+            showNotification('Reply added!', 'success');
+        } else {
+            showNotification(result.error || 'Failed to add reply', 'error');
+        }
+    } catch (error) {
+        showNotification('Failed to add reply', 'error');
+    }
 }
 
-function deleteComment(commentId) {
+async function deleteComment(commentId) {
     if (!currentUser) {
         showAuthModal('login');
-        return;
-    }
-    
-    // Check if it's a reply
-    let commentToDelete = null;
-    let isReply = false;
-    let parentComment = null;
-    
-    // Search in main comments
-    commentToDelete = window.commentsData.find(c => c.id === commentId);
-    
-    // Search in replies
-    if (!commentToDelete) {
-        for (let comment of window.commentsData) {
-            if (comment.replies) {
-                const reply = comment.replies.find(r => r.id === commentId);
-                if (reply) {
-                    commentToDelete = reply;
-                    parentComment = comment;
-                    isReply = true;
-                    break;
-                }
-            }
-        }
-    }
-    
-    if (!commentToDelete) return;
-    
-    // Check permissions
-    if (commentToDelete.author !== currentUser.username && !currentUser.isAdmin) {
-        showCustomAlert('Error', 'You can only delete your own comments!', 'error');
         return;
     }
     
     showCustomConfirm(
         'Delete Comment',
         'Are you sure you want to delete this comment?',
-        () => {
-            if (isReply && parentComment) {
-                parentComment.replies = parentComment.replies.filter(r => r.id !== commentId);
-            } else {
-                window.commentsData = window.commentsData.filter(c => c.id !== commentId);
+        async () => {
+            try {
+                const result = await window.userSystem.deleteComment(commentId);
+                if (result.success) {
+                    await loadComments();
+                    showNotification('Comment deleted!', 'success');
+                } else {
+                    showNotification(result.error || 'Failed to delete comment', 'error');
+                }
+            } catch (error) {
+                showNotification('Failed to delete comment', 'error');
             }
-            
-            localStorage.setItem('pickleball_comments', JSON.stringify(window.commentsData));
-            renderComments();
-            showNotification('Comment deleted!', 'success');
         }
     );
-}
-
-function handleVote(commentId, voteType) {
-    if (!currentUser) {
-        showAuthModal('login');
-        return;
-    }
-    
-    // Find comment or reply
-    let commentToVote = null;
-    
-    // Search in main comments
-    commentToVote = window.commentsData.find(c => c.id === commentId);
-    
-    // Search in replies
-    if (!commentToVote) {
-        for (let comment of window.commentsData) {
-            if (comment.replies) {
-                const reply = comment.replies.find(r => r.id === commentId);
-                if (reply) {
-                    commentToVote = reply;
-                    break;
-                }
-            }
-        }
-    }
-    
-    if (!commentToVote) return;
-    
-    if (!commentToVote.votes) commentToVote.votes = {};
-    if (!commentToVote.voteScore) commentToVote.voteScore = 0;
-    
-    const currentVote = commentToVote.votes[currentUser.username];
-    
-    if (currentVote === voteType) {
-        // Remove vote
-        delete commentToVote.votes[currentUser.username];
-        commentToVote.voteScore -= (voteType === 'up' ? 1 : -1);
-    } else {
-        // Change vote
-        if (currentVote) {
-            commentToVote.voteScore -= (currentVote === 'up' ? 1 : -1);
-        }
-        commentToVote.votes[currentUser.username] = voteType;
-        commentToVote.voteScore += (voteType === 'up' ? 1 : -1);
-    }
-    
-    localStorage.setItem('pickleball_comments', JSON.stringify(window.commentsData));
-    renderComments();
 }
 
 function toggleReplyForm(commentId) {
@@ -690,17 +458,34 @@ function clearCommentInput() {
     document.getElementById('commentInput').value = '';
 }
 
-// ============ UPDATES FUNCTIONS ============
+// ============ UPDATES SYSTEM (UPDATED FOR API) ============
+window.updatesData = []; // Khởi tạo rỗng, sẽ load từ API
+
+async function loadUpdates() {
+    try {
+        const result = await window.userSystem.getUpdates();
+        if (result.success && result.data) {
+            window.updatesData = result.data;
+        } else {
+            window.updatesData = [];
+        }
+        renderUpdates();
+    } catch (error) {
+        console.error('Failed to load updates:', error);
+        window.updatesData = [];
+        renderUpdates();
+    }
+}
+
 function renderUpdates() {
-    const updates = JSON.parse(localStorage.getItem('pickleball_updates') || '[]');
     const updatesCount = document.getElementById('updatesCount');
     const updatesSlider = document.getElementById('updatesSlider');
     const updatePreviews = document.getElementById('updatePreviews');
     const noUpdates = document.getElementById('noUpdates');
     
-    if (updatesCount) updatesCount.textContent = `(${updates.length})`;
+    if (updatesCount) updatesCount.textContent = `(${window.updatesData.length})`;
     
-    // Reset preview index
+    // Reset indices
     currentPreviewIndex = 0;
     currentUpdateIndex = 0;
     
@@ -708,7 +493,7 @@ function renderUpdates() {
     const searchInput = document.getElementById('searchUpdates');
     if (searchInput) searchInput.value = '';
     
-    if (updates.length === 0) {
+    if (!window.updatesData || window.updatesData.length === 0) {
         if (updatesSlider) updatesSlider.style.display = 'none';
         if (updatePreviews) updatePreviews.style.display = 'none';
         if (noUpdates) noUpdates.style.display = 'block';
@@ -720,17 +505,17 @@ function renderUpdates() {
         if (updatesSlider) updatesSlider.style.display = 'block';
         if (updatePreviews) updatePreviews.style.display = 'none';
         if (noUpdates) noUpdates.style.display = 'none';
-        renderUpdateSlider(updates);
+        renderUpdateSlider();
     } else {
         // CHƯA LOGIN: Show locked previews
         if (updatesSlider) updatesSlider.style.display = 'none';
         if (updatePreviews) updatePreviews.style.display = 'block';
         if (noUpdates) noUpdates.style.display = 'none';
-        renderUpdatePreviews(updates);
+        renderUpdatePreviews();
     }
 }
 
-function renderUpdateSlider(updates) {
+function renderUpdateSlider() {
     const slidesContainer = document.getElementById('updateSlides');
     const counter = document.getElementById('updateCounter');
     const dotsContainer = document.getElementById('updateDots');
@@ -740,8 +525,8 @@ function renderUpdateSlider(updates) {
     if (!slidesContainer) return;
     
     if (isShowingAllUpdates) {
-        // SHOW ALL - hiển thị tất cả
-        slidesContainer.innerHTML = updates.map(update => `
+        // SHOW ALL
+        slidesContainer.innerHTML = window.updatesData.map(update => `
             <div class="update-slide">
                 <h3><i class="fas fa-newspaper"></i> ${update.title}</h3>
                 <div class="update-content-unlocked">
@@ -760,18 +545,17 @@ function renderUpdateSlider(updates) {
             </div>
         `).join('');
         
-        if (counter) counter.textContent = `All Updates (${updates.length})`;
+        if (counter) counter.textContent = `All Updates (${window.updatesData.length})`;
         if (dotsContainer) dotsContainer.innerHTML = '';
         
-        // Disable prev/next buttons khi show all
         if (prevBtn) prevBtn.disabled = true;
         if (nextBtn) nextBtn.disabled = true;
         
     } else {
-        // SHOW SINGLE - chỉ hiển thị 1 update
-        if (updates.length === 0) return;
+        // SHOW SINGLE
+        if (window.updatesData.length === 0) return;
         
-        const update = updates[currentUpdateIndex];
+        const update = window.updatesData[currentUpdateIndex];
         slidesContainer.innerHTML = `
             <div class="update-slide">
                 <h3><i class="fas fa-newspaper"></i> ${update.title}</h3>
@@ -791,37 +575,35 @@ function renderUpdateSlider(updates) {
             </div>
         `;
         
-        if (counter) counter.textContent = `${currentUpdateIndex + 1} / ${updates.length}`;
+        if (counter) counter.textContent = `${currentUpdateIndex + 1} / ${window.updatesData.length}`;
         
         // Create dots
-        if (dotsContainer && updates.length > 1) {
-            dotsContainer.innerHTML = updates.map((_, index) => 
+        if (dotsContainer && window.updatesData.length > 1) {
+            dotsContainer.innerHTML = window.updatesData.map((_, index) => 
                 `<span class="slider-dot ${index === currentUpdateIndex ? 'active' : ''}" onclick="goToSlide(${index})"></span>`
             ).join('');
         }
         
         // Enable/disable buttons
-        if (prevBtn) prevBtn.disabled = updates.length <= 1;
-        if (nextBtn) nextBtn.disabled = updates.length <= 1;
+        if (prevBtn) prevBtn.disabled = window.updatesData.length <= 1;
+        if (nextBtn) nextBtn.disabled = window.updatesData.length <= 1;
     }
 }
 
-// ============ FIXED VERSION - KHÔNG LỘ NỘI DUNG ============
-function renderUpdatePreviews(updates) {
+function renderUpdatePreviews() {
     const previewsContainer = document.getElementById('updatePreviews');
     if (!previewsContainer) return;
     
-    if (updates.length === 0) {
+    if (!window.updatesData || window.updatesData.length === 0) {
         previewsContainer.innerHTML = `<div class="no-updates"><p>No updates yet</p></div>`;
         return;
     }
     
-    // CHỈ HIỂN THỊ THÔNG TIN TỐI THIỂU - KHÔNG CÓ NỘI DUNG THẬT
+    // CHỈ HIỂN THỊ THÔNG BÁO LOGIN - KHÔNG NỘI DUNG THẬT
     previewsContainer.innerHTML = `
         <div class="update-preview">
             <h4><i class="fas fa-newspaper"></i> Update #${currentPreviewIndex + 1}</h4>
             
-            <!-- CHỈ 1 DÒNG THÔNG BÁO - KHÔNG CÓ NỘI DUNG UPDATE -->
             <div style="background: rgba(255,152,0,0.1); border: 1px solid rgba(255,152,0,0.3); 
                         border-radius: 8px; padding: 40px 20px; text-align: center; 
                         color: #FF9800; font-weight: bold; margin: 20px 0;">
@@ -838,12 +620,12 @@ function renderUpdatePreviews(updates) {
             </div>
         </div>
         
-        ${updates.length > 1 ? `
+        ${window.updatesData.length > 1 ? `
             <div class="preview-navigation">
                 <button class="preview-nav-btn" onclick="prevPreviewUpdate()">
                     <i class="fas fa-chevron-left"></i> Previous
                 </button>
-                <span class="preview-counter">${currentPreviewIndex + 1}/${updates.length}</span>
+                <span class="preview-counter">${currentPreviewIndex + 1}/${window.updatesData.length}</span>
                 <button class="preview-nav-btn" onclick="nextPreviewUpdate()">
                     Next <i class="fas fa-chevron-right"></i>
                 </button>
@@ -853,24 +635,21 @@ function renderUpdatePreviews(updates) {
 }
 
 function nextPreviewUpdate() {
-    const updates = JSON.parse(localStorage.getItem('pickleball_updates') || '[]');
-    if (currentPreviewIndex >= updates.length - 1) return;
+    if (currentPreviewIndex >= window.updatesData.length - 1) return;
     currentPreviewIndex++;
-    renderUpdatePreviews(updates);
+    renderUpdatePreviews();
 }
 
 function prevPreviewUpdate() {
-    const updates = JSON.parse(localStorage.getItem('pickleball_updates') || '[]');
     if (currentPreviewIndex <= 0) return;
     currentPreviewIndex--;
-    renderUpdatePreviews(updates);
+    renderUpdatePreviews();
 }
 
 function filterUpdates() {
     const searchTerm = document.getElementById('searchUpdates')?.value.toLowerCase() || '';
-    const updates = JSON.parse(localStorage.getItem('pickleball_updates') || '[]');
     
-    const filtered = updates.filter(update => 
+    const filtered = window.updatesData.filter(update => 
         update.title.toLowerCase().includes(searchTerm) || 
         update.content.toLowerCase().includes(searchTerm)
     );
@@ -880,7 +659,6 @@ function filterUpdates() {
     currentUpdateIndex = 0;
     
     if (currentUser) {
-        // Người đã login
         if (filtered.length === 0) {
             document.getElementById('updatesSlider').innerHTML = `
                 <div class="no-search-results" style="text-align: center; padding: 40px;">
@@ -889,10 +667,9 @@ function filterUpdates() {
                 </div>
             `;
         } else {
-            renderUpdateSlider(filtered);
+            renderUpdateSlider();
         }
     } else {
-        // Người chưa login
         if (filtered.length === 0) {
             document.getElementById('updatePreviews').innerHTML = `
                 <div class="no-search-results">
@@ -902,20 +679,193 @@ function filterUpdates() {
                 </div>
             `;
         } else {
-            renderUpdatePreviews(filtered);
+            renderUpdatePreviews();
         }
     }
     
     document.getElementById('updatesCount').textContent = `(${filtered.length})`;
 }
 
+// Slider control functions (giữ nguyên)
+function prevUpdate() {
+    if (isShowingAllUpdates || window.updatesData.length <= 1) return;
+    currentUpdateIndex = (currentUpdateIndex - 1 + window.updatesData.length) % window.updatesData.length;
+    renderUpdateSlider();
+}
 
+function nextUpdate() {
+    if (isShowingAllUpdates || window.updatesData.length <= 1) return;
+    currentUpdateIndex = (currentUpdateIndex + 1) % window.updatesData.length;
+    renderUpdateSlider();
+}
 
-// Game functions
+function toggleShowAll() {
+    isShowingAllUpdates = !isShowingAllUpdates;
+    currentUpdateIndex = 0;
+    
+    const showAllBtn = document.getElementById('showAllUpdates');
+    if (showAllBtn) {
+        showAllBtn.innerHTML = isShowingAllUpdates ? 
+            '<i class="fas fa-times"></i> Show Single' : 
+            '<i class="fas fa-list"></i> Show All';
+    }
+    
+    renderUpdateSlider();
+}
+
+function goToSlide(index) {
+    if (isShowingAllUpdates || index < 0 || index >= window.updatesData.length) return;
+    currentUpdateIndex = index;
+    renderUpdateSlider();
+}
+
+// ============ ADMIN FUNCTIONS (UPDATED FOR API) ============
+async function loadAdminStats() {
+    try {
+        const result = await window.userSystem.getStats();
+        if (result.success) {
+            document.getElementById('totalUsers').textContent = result.data.totalUsers || 0;
+            document.getElementById('totalComments').textContent = result.data.totalComments || 0;
+            document.getElementById('bannedUsers').textContent = result.data.totalBanned || 0;
+            document.getElementById('totalUpdates').textContent = result.data.totalUpdates || 0;
+        }
+    } catch (error) {
+        console.error('Failed to load stats:', error);
+    }
+}
+
+async function banUser(userId) {
+    showCustomConfirm(
+        'Ban User',
+        'Are you sure you want to ban this user?',
+        async () => {
+            try {
+                const result = await window.userSystem.banUser(userId);
+                if (result.success) {
+                    showNotification(result.message || 'User banned', 'success');
+                    if (typeof loadAdminUsers === 'function') await loadAdminUsers();
+                    await loadAdminStats();
+                } else {
+                    showNotification(result.error || 'Failed to ban user', 'error');
+                }
+            } catch (error) {
+                showNotification('Failed to ban user', 'error');
+            }
+        }
+    );
+}
+
+async function promoteUser(userId) {
+    try {
+        const result = await window.userSystem.promoteUser(userId);
+        if (result.success) {
+            showNotification(result.message || 'User promoted', 'success');
+            if (typeof loadAdminUsers === 'function') await loadAdminUsers();
+        } else {
+            showNotification(result.error || 'Failed to promote user', 'error');
+        }
+    } catch (error) {
+        showNotification('Failed to promote user', 'error');
+    }
+}
+
+async function deleteUser(userId) {
+    showCustomConfirm(
+        'Delete User',
+        'Are you sure you want to delete this user? This cannot be undone.',
+        async () => {
+            try {
+                const result = await window.userSystem.deleteUser(userId);
+                if (result.success) {
+                    showNotification(result.message || 'User deleted', 'success');
+                    if (typeof loadAdminUsers === 'function') await loadAdminUsers();
+                    await loadAdminStats();
+                } else {
+                    showNotification(result.error || 'Failed to delete user', 'error');
+                }
+            } catch (error) {
+                showNotification('Failed to delete user', 'error');
+            }
+        }
+    );
+}
+
+// ============ UPDATE MANAGEMENT (UPDATED FOR API) ============
+async function submitUpdate() {
+    const title = document.getElementById('updateTitle').value.trim();
+    const content = document.getElementById('updateContent').value.trim();
+    
+    if (!title || !content) {
+        showNotification('Please fill in all fields', 'error');
+        return;
+    }
+    
+    if (!window.userSystem.isAdmin()) {
+        showNotification('Admin access required', 'error');
+        return;
+    }
+    
+    try {
+        const result = await window.userSystem.createUpdate(title, content);
+        if (result.success) {
+            closeUpdateForm();
+            await loadUpdates();
+            showNotification('Update created!', 'success');
+        } else {
+            showNotification(result.error || 'Failed to create update', 'error');
+        }
+    } catch (error) {
+        showNotification('Failed to create update', 'error');
+    }
+}
+
+async function submitEditUpdate(updateId) {
+    const title = document.getElementById('editUpdateTitle').value.trim();
+    const content = document.getElementById('editUpdateContent').value.trim();
+    
+    if (!title || !content) {
+        showNotification('Please fill in all fields', 'error');
+        return;
+    }
+    
+    try {
+        const result = await window.userSystem.editUpdate(updateId, title, content);
+        if (result.success) {
+            closeCustomModal('editUpdateFormModal');
+            await loadUpdates();
+            showNotification('Update updated!', 'success');
+        } else {
+            showNotification(result.error || 'Failed to update', 'error');
+        }
+    } catch (error) {
+        showNotification('Failed to update', 'error');
+    }
+}
+
+async function deleteUpdate(updateId) {
+    showCustomConfirm(
+        'Delete Update',
+        'Are you sure you want to delete this update?',
+        async () => {
+            try {
+                const result = await window.userSystem.deleteUpdate(updateId);
+                if (result.success) {
+                    await loadUpdates();
+                    showNotification('Update deleted!', 'success');
+                } else {
+                    showNotification(result.error || 'Failed to delete update', 'error');
+                }
+            } catch (error) {
+                showNotification('Failed to delete update', 'error');
+            }
+        }
+    );
+}
+
+// ============ GAME FUNCTIONS (GIỮ NGUYÊN HOÀN TOÀN) ============
 function startGame() {
     const placeholder = document.getElementById('gamePlaceholder');
     
-    // Hiển thị loading
     placeholder.innerHTML = `
         <div class="placeholder-content">
             <h2 style="color: white; margin-bottom: 20px;">🎮 Game Loading...</h2>
@@ -924,11 +874,9 @@ function startGame() {
         </div>
     `;
     
-    // Sau 1 giây load game
     setTimeout(() => {
         placeholder.innerHTML = '';
         
-        // Tạo container cho game
         const gameContainer = document.createElement('div');
         gameContainer.id = 'gameContainer';
         gameContainer.style.cssText = `
@@ -941,7 +889,6 @@ function startGame() {
             overflow: hidden;
         `;
         
-        // Tạo iframe
         const iframe = document.createElement('iframe');
         iframe.id = 'gameFrame';
         iframe.src = 'Game/Game.html';
@@ -953,19 +900,15 @@ function startGame() {
             display: block;
         `;
         
-        // Thêm vào DOM
         gameContainer.appendChild(iframe);
         placeholder.appendChild(gameContainer);
         
-        // Lưu vị trí scroll hiện tại
         scrollPosition = window.pageYOffset || document.documentElement.scrollTop;
         
-        // Tự động vào fullscreen
         if (!isFullscreen) {
             toggleFullscreen();
         }
         
-        // Thêm nút exit
         const exitBtn = document.createElement('button');
         exitBtn.className = 'exit-game-btn';
         exitBtn.innerHTML = '✕';
@@ -978,20 +921,14 @@ function startGame() {
 }
 
 function exitGame() {
-    // Lưu vị trí scroll trước khi exit
     scrollPosition = window.pageYOffset || document.documentElement.scrollTop;
     
-    // Xóa iframe game
     const gameFrame = document.getElementById('gameFrame');
-    if (gameFrame) {
-        gameFrame.remove();
-    }
+    if (gameFrame) gameFrame.remove();
     
-    // Xóa nút exit
     const exitBtn = document.querySelector('.exit-game-btn');
     if (exitBtn) exitBtn.remove();
     
-    // Khôi phục placeholder về ban đầu
     const placeholder = document.getElementById('gamePlaceholder');
     placeholder.innerHTML = `
         <div class="placeholder-content">
@@ -1002,12 +939,9 @@ function exitGame() {
         </div>
     `;
     
-    // Thoát fullscreen nếu đang ở chế độ fullscreen
     if (isFullscreen) {
-        // Mở lại scroll trước khi exit
         enableScroll();
         
-        // Thoát fullscreen
         if (document.exitFullscreen) {
             document.exitFullscreen();
         } else if (document.mozCancelFullScreen) {
@@ -1022,7 +956,6 @@ function exitGame() {
         isFullscreen = false;
     }
     
-    // Khôi phục scroll position
     setTimeout(() => {
         window.scrollTo(0, scrollPosition);
     }, 100);
@@ -1030,19 +963,15 @@ function exitGame() {
     showNotification('Game exited', 'info');
 }
 
-// Fullscreen functions
+// ============ FULLSCREEN FUNCTIONS (GIỮ NGUYÊN HOÀN TOÀN) ============
 function toggleFullscreen() {
     const gamePlayer = document.getElementById('gamePlayer');
     const header = document.querySelector('.header');
     
     if (!isFullscreen) {
-        // Lưu vị trí scroll trước khi vào fullscreen
         scrollPosition = window.pageYOffset || document.documentElement.scrollTop;
-        
-        // Chặn scroll
         disableScroll();
         
-        // Ẩn header nếu ở landscape
         if (window.innerWidth < 768 && window.matchMedia("(orientation: landscape)").matches) {
             if (header) {
                 header.style.display = 'none';
@@ -1061,15 +990,12 @@ function toggleFullscreen() {
             gamePlayer.msRequestFullscreen();
         }
         
-        // Add mobile rotation class
         if (window.innerWidth < 768) {
             gamePlayer.classList.add('fullscreen');
         }
     } else {
-        // Mở lại scroll
         enableScroll();
         
-        // Hiện lại header
         if (header) {
             header.style.display = '';
             header.style.opacity = '';
@@ -1087,14 +1013,11 @@ function toggleFullscreen() {
         }
         
         gamePlayer.classList.remove('fullscreen');
-        
-        // Restore scroll position
         window.scrollTo(0, scrollPosition);
     }
     
     isFullscreen = !isFullscreen;
 }
-
 
 function setupFullscreenListener() {
     document.addEventListener('fullscreenchange', updateFullscreenState);
@@ -1102,7 +1025,6 @@ function setupFullscreenListener() {
     document.addEventListener('mozfullscreenchange', updateFullscreenState);
     document.addEventListener('MSFullscreenChange', updateFullscreenState);
     
-    // Thêm listener để chặn scroll bằng touch trên mobile
     document.addEventListener('touchmove', function(e) {
         if (isFullscreen) {
             e.preventDefault();
@@ -1117,29 +1039,22 @@ function updateFullscreenState() {
         !document.webkitFullscreenElement &&
         !document.mozFullScreenElement &&
         !document.msFullscreenElement) {
-        // Đã thoát fullscreen
         isFullscreen = false;
         document.getElementById('gamePlayer').classList.remove('fullscreen');
         
-        // Hiện lại header
         if (header) {
             header.style.display = '';
             header.style.opacity = '';
             header.style.visibility = '';
         }
         
-        // Mở lại scroll
         enableScroll();
-        
-        // Khôi phục scroll position
         setTimeout(() => {
             window.scrollTo(0, scrollPosition);
         }, 100);
     } else {
-        // Đã vào fullscreen
         isFullscreen = true;
         
-        // Ẩn header nếu ở landscape trên mobile
         if (window.innerWidth < 768 && window.matchMedia("(orientation: landscape)").matches) {
             if (header) {
                 header.style.display = 'none';
@@ -1152,28 +1067,23 @@ function updateFullscreenState() {
             document.getElementById('gamePlayer').classList.add('fullscreen');
         }
         
-        // Lưu scroll position và chặn scroll
         scrollPosition = window.pageYOffset || document.documentElement.scrollTop;
         disableScroll();
     }
 }
 
 function setupOrientationListener() {
-    // Kiểm tra khi xoay màn hình
     window.addEventListener('orientationchange', function() {
         const header = document.querySelector('.header');
         
         if (isFullscreen) {
-            // Nếu đang fullscreen và xoay ngang
             if (window.matchMedia("(orientation: landscape)").matches) {
-                // Ẩn header
                 if (header) {
                     header.style.display = 'none';
                     header.style.opacity = '0';
                     header.style.visibility = 'hidden';
                 }
             } else {
-                // Xoay dọc - hiện header lại
                 if (header) {
                     header.style.display = '';
                     header.style.opacity = '';
@@ -1184,12 +1094,9 @@ function setupOrientationListener() {
     });
 }
 
-
 function disableScroll() {
-    // Lưu vị trí scroll hiện tại
     scrollPosition = window.pageYOffset || document.documentElement.scrollTop;
     
-    // Thêm CSS để chặn scroll
     document.body.style.cssText = `
         position: fixed;
         top: -${scrollPosition}px;
@@ -1199,293 +1106,556 @@ function disableScroll() {
         height: 100vh;
     `;
     
-    // Lưu class để nhận biết
     document.body.classList.add('no-scroll');
 }
  
 function enableScroll() {
-    // Xóa CSS chặn scroll
     document.body.style.cssText = '';
     document.body.classList.remove('no-scroll');
-    
-    // Khôi phục scroll position
     window.scrollTo(0, scrollPosition);
 }
 
-// Donate function - SINGLE BUTTON với form
+// ============ DONATE FUNCTIONS (GIỮ NGUYÊN HOÀN TOÀN) ============
 function showDonateForm() {
-    // Tạo modal donation form
+    // XÓA modal cũ nếu có
+    const oldModal = document.querySelector('.donate-modal-overlay');
+    if (oldModal) oldModal.remove();
+    
+    // Tạo modal mới - ĐẢM BẢO LUÔN VỪA MÀN HÌNH
     const modalOverlay = document.createElement('div');
     modalOverlay.className = 'donate-modal-overlay';
+    
+    // CSS ĐƠN GIẢN - QUAN TRỌNG: luôn căn giữa và vừa màn hình
     modalOverlay.style.cssText = `
         position: fixed;
         top: 0;
         left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.85);
+        width: 100vw;
+        height: 100vh;
+        background: rgba(0, 0, 0, 0.8);
         display: flex;
         align-items: center;
         justify-content: center;
-        z-index: 2000;
-        backdrop-filter: blur(5px);
+        z-index: 9999;
+        padding: 20px;
+        box-sizing: border-box;
     `;
-
-    // Tạo modal content với form
+    
+    // Tự động điền thông tin nếu đã login
+    const isLoggedIn = currentUser ? true : false;
+    const userName = currentUser ? currentUser.username : '';
+    const userEmail = currentUser ? (currentUser.email || '') : '';
+    
+    // NỘI DUNG MODAL - SIÊU NGẮN, KHÔNG BAO GIỜ VƯỢT QUÁ MÀN HÌNH
     const modalContent = document.createElement('div');
-    modalContent.className = 'donate-modal';
+    modalContent.className = 'donate-modal-compact';
     modalContent.style.cssText = `
-        background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
-        border-radius: 20px;
-        padding: 30px;
-        width: 90%;
-        max-width: 500px;
-        border: 1px solid rgba(255, 71, 87, 0.3);
-        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
-        animation: modalFadeIn 0.3s ease;
+        background: #1a1a2e;
+        border-radius: 10px;
+        width: 100%;
+        max-width: 400px; /* KHÔNG QUÁ RỘNG */
+        max-height: 85vh; /* KHÔNG QUÁ CAO - LUÔN VỪA MÀN HÌNH */
+        overflow: hidden; /* ẨN SCROLL */
+        border: 2px solid #ff4757;
+        position: relative;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.5);
     `;
-
+    
+    // HTML - CỰC KỲ ĐƠN GIẢN
     modalContent.innerHTML = `
-        <div class="modal-header" style="margin-bottom: 20px;">
-            <h2 style="color: white; display: flex; align-items: center; gap: 10px; margin: 0;">
-                <i class="fas fa-donate" style="color: #ff4757;"></i> Make a Donation
-            </h2>
-            <button class="modal-close-btn" onclick="this.closest('.donate-modal-overlay')?.remove()" style="background: rgba(255,71,87,0.1); border: 1px solid rgba(255,71,87,0.3); color: #ff4757; width: 36px; height: 36px; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 1.2rem; transition: all 0.3s ease;">×</button>
+        <!-- HEADER VỚI NÚT ĐÓNG LỚN, LUÔN HIỂN THỊ -->
+        <div style="position: sticky; top: 0; background: #ff4757; padding: 12px 15px; 
+                    display: flex; justify-content: space-between; align-items: center; 
+                    z-index: 10;">
+            <div style="color: white; font-weight: bold; font-size: 1.1rem;">
+                <i class="fas fa-heart"></i> DONATE
+            </div>
+            <button onclick="this.closest('.donate-modal-overlay')?.remove()" 
+                    style="background: white; color: #ff4757; border: none; width: 30px; 
+                           height: 30px; border-radius: 50%; font-size: 1.2rem; 
+                           font-weight: bold; cursor: pointer; display: flex; 
+                           align-items: center; justify-content: center; padding: 0;">
+                ×
+            </button>
         </div>
         
-        <div class="modal-body" style="color: white;">
-            <form id="donateForm">
-                <div style="margin-bottom: 20px;">
-                    <label style="display: block; color: #aaa; margin-bottom: 8px; font-size: 0.9rem;">
-                        <i class="fas fa-user"></i> Your Name
-                    </label>
-                    <input type="text" id="donateName" placeholder="Enter your name" required
-                           style="width: 100%; padding: 12px; background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.1); border-radius: 10px; color: white; font-size: 1rem;">
+        <!-- BODY - CHỈ CÓ 4 PHẦN, KHÔNG BAO GIỜ DÀI -->
+        <div style="padding: 20px; color: white; max-height: calc(85vh - 60px); overflow-y: auto;">
+            ${isLoggedIn ? `
+                <div style="background: rgba(33,150,243,0.2); padding: 8px; border-radius: 5px; 
+                            margin-bottom: 15px; text-align: center; font-size: 0.9rem;">
+                    <i class="fas fa-user"></i> ${userName}
                 </div>
-                
-                <div style="margin-bottom: 20px;">
-                    <label style="display: block; color: #aaa; margin-bottom: 8px; font-size: 0.9rem;">
-                        <i class="fas fa-envelope"></i> Email Address
-                    </label>
-                    <input type="email" id="donateEmail" placeholder="Enter your email" required
-                           style="width: 100%; padding: 12px; background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.1); border-radius: 10px; color: white; font-size: 1rem;">
-                </div>
-                
-                <div style="margin-bottom: 25px;">
-                    <label style="display: block; color: #aaa; margin-bottom: 8px; font-size: 0.9rem;">
-                        <i class="fas fa-money-bill-wave"></i> Donation Amount ($)
-                    </label>
-                    <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                        <button type="button" class="amount-btn" data-amount="5" onclick="setAmount(5)">$5</button>
-                        <button type="button" class="amount-btn" data-amount="10" onclick="setAmount(10)">$10</button>
-                        <button type="button" class="amount-btn" data-amount="20" onclick="setAmount(20)">$20</button>
-                        <button type="button" class="amount-btn" data-amount="50" onclick="setAmount(50)">$50</button>
-                        <button type="button" class="amount-btn" data-amount="100" onclick="setAmount(100)">$100</button>
-                    </div>
-                    <div style="margin-top: 10px;">
-                        <input type="number" id="donateAmount" placeholder="Custom amount" min="1" step="0.01" required
-                               style="width: 100%; padding: 12px; background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.1); border-radius: 10px; color: white; font-size: 1rem;">
-                    </div>
-                </div>
-                
-                <div style="margin-bottom: 20px;">
-                    <label style="display: block; color: #aaa; margin-bottom: 8px; font-size: 0.9rem;">
-                        <i class="fas fa-comment"></i> Message (Optional)
-                    </label>
-                    <textarea id="donateMessage" placeholder="Add a message..." rows="3"
-                              style="width: 100%; padding: 12px; background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.1); border-radius: 10px; color: white; font-size: 1rem; resize: vertical;"></textarea>
-                </div>
-                
-                <button type="button" onclick="submitDonation()" 
-                        style="width: 100%; background: linear-gradient(135deg, #4CAF50, #45a049); color: white; border: none; padding: 15px; border-radius: 10px; font-size: 1.1rem; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; transition: all 0.3s ease;">
-                    <i class="fas fa-paper-plane"></i> Proceed to Payment
-                </button>
-                
-                <div style="margin-top: 15px; color: #666; font-size: 0.85rem; text-align: center;">
-                    <i class="fas fa-lock"></i> Secure payment processing
-                </div>
-            </form>
+            ` : ''}
             
-            <!-- QR Code Display Area (sẽ hiển thị sau khi submit) -->
-            <div id="qrCodeContainer" style="display: none; margin-top: 25px; text-align: center;">
-                <h3 style="color: white; margin-bottom: 15px;">Scan QR Code to Complete Donation</h3>
-                <div id="qrCodeImage" style="background: white; padding: 20px; border-radius: 10px; display: inline-block;">
-                    <!-- QR code sẽ được hiển thị ở đây -->
+            <!-- PHẦN 1: SỐ TIỀN (QUAN TRỌNG NHẤT) -->
+            <div style="margin-bottom: 20px;">
+                <div style="color: #aaa; margin-bottom: 8px; font-size: 0.9rem;">
+                    <i class="fas fa-dollar-sign"></i> Amount ($)
                 </div>
-                <div style="margin-top: 15px; color: #aaa; font-size: 0.9rem;">
-                    <p>Bank Account: <strong>123-456-789</strong></p>
-                    <p>Account Holder: <strong>GAME DEVELOPMENT</strong></p>
+                
+                <!-- 5 NÚT TRÊN 1 DÒNG -->
+                <div style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; margin-bottom: 10px;">
+                    ${[1, 5, 10, 20, 50].map(amt => `
+                        <button type="button" onclick="setAmount(${amt})" 
+                                style="padding: 10px; background: #2a2a3e; border: 1px solid #444; 
+                                       color: white; border-radius: 5px; cursor: pointer; 
+                                       font-weight: bold;">
+                            $${amt}
+                        </button>
+                    `).join('')}
                 </div>
+                
+                <!-- Ô NHẬP SỐ TIỀN -->
+                <input type="number" id="donateAmount" 
+                       placeholder="Other amount (min $1)" 
+                       min="1" step="0.01"
+                       style="width: 100%; padding: 12px; background: #2a2a3e; border: 1px solid #444; 
+                              border-radius: 5px; color: white; font-size: 1rem; box-sizing: border-box;">
+                <div style="color: #888; font-size: 0.8rem; margin-top: 5px;">
+                    Minimum: $1.00
+                </div>
+            </div>
+            
+            <!-- PHẦN 2: THÔNG TIN (CHỈ KHI CHƯA LOGIN) -->
+            ${!isLoggedIn ? `
+                <div style="margin-bottom: 15px;">
+                    <input type="text" id="donateName" placeholder="Your name" 
+                           style="width: 100%; padding: 10px; background: #2a2a3e; border: 1px solid #444; 
+                                  border-radius: 5px; color: white; margin-bottom: 10px; box-sizing: border-box;">
+                    
+                    <input type="email" id="donateEmail" placeholder="your@email.com" 
+                           style="width: 100%; padding: 10px; background: #2a2a3e; border: 1px solid #444; 
+                                  borderRadius: 5px; color: white; box-sizing: border-box;">
+                </div>
+            ` : ''}
+            
+            <!-- PHẦN 3: NÚT XÁC NHẬN LỚN, DỄ THẤY -->
+            <button onclick="submitDonateForm()" 
+                    style="width: 100%; background: #4CAF50; color: white; border: none; 
+                           padding: 15px; border-radius: 5px; font-size: 1.1rem; font-weight: bold; 
+                           cursor: pointer; margin-top: 10px;">
+                <i class="fas fa-paper-plane"></i> DONATE NOW
+            </button>
+            
+            <!-- PHẦN 4: THÔNG BÁO NHỎ -->
+            <div style="color: #666; text-align: center; margin-top: 15px; font-size: 0.8rem;">
+                <i class="fas fa-lock"></i> Secure payment
             </div>
         </div>
     `;
-
+    
     modalOverlay.appendChild(modalContent);
     document.body.appendChild(modalOverlay);
-
-    // Thêm CSS styles
+    
+    // THÊM CSS ĐƠN GIẢN
     const style = document.createElement('style');
     style.textContent = `
-        .amount-btn {
-            flex: 1;
-            min-width: 60px;
-            padding: 10px;
-            background: rgba(33, 150, 243, 0.1);
-            border: 1px solid rgba(33, 150, 243, 0.3);
-            color: #2196F3;
-            border-radius: 8px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-weight: bold;
+        /* ANIMATION ĐƠN GIẢN */
+        .donate-modal-overlay {
+            animation: fadeIn 0.2s ease;
         }
         
-        .amount-btn:hover {
-            background: rgba(33, 150, 243, 0.2);
-            transform: translateY(-2px);
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
         
-        .amount-btn.active {
-            background: #2196F3;
-            color: white;
-            border-color: #2196F3;
-        }
-        
-        button[type="button"]:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
-        }
-        
-        @keyframes modalFadeIn {
-            from { opacity: 0; transform: translateY(-20px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-        
-        input:focus, textarea:focus {
+        /* FOCUS STATE */
+        input:focus {
             outline: none;
-            border-color: #2196F3 !important;
-            background: rgba(33, 150, 243, 0.1) !important;
+            border-color: #4CAF50 !important;
+        }
+        
+        button:hover {
+            opacity: 0.9;
+        }
+        
+        /* ĐẢM BẢO KHÔNG SCROLL TRÊN MOBILE */
+        @media (max-height: 600px) {
+            .donate-modal-compact {
+                max-height: 90vh !important;
+            }
+            
+            .donate-modal-compact > div:last-child {
+                max-height: calc(90vh - 60px) !important;
+            }
         }
     `;
-    
     modalOverlay.appendChild(style);
-
-    // Đóng modal khi click ra ngoài
+    
+    // ĐÓNG KHI CLICK NGOÀI
     modalOverlay.addEventListener('click', function(e) {
         if (e.target === modalOverlay) {
             modalOverlay.remove();
         }
     });
-}
-
-// Set amount khi click nút
-function setAmount(amount) {
-    document.getElementById('donateAmount').value = amount;
     
-    // Highlight nút được chọn
-    document.querySelectorAll('.amount-btn').forEach(btn => {
-        btn.classList.remove('active');
-        if (parseInt(btn.dataset.amount) === amount) {
-            btn.classList.add('active');
+    // ĐÓNG BẰNG ESCAPE
+    document.addEventListener('keydown', function closeOnEscape(e) {
+        if (e.key === 'Escape') {
+            modalOverlay.remove();
+            document.removeEventListener('keydown', closeOnEscape);
         }
     });
+    
+    // TỰ ĐỘNG FOCUS
+    setTimeout(() => {
+        document.getElementById('donateAmount').focus();
+    }, 100);
 }
 
-// Submit donation form
+// Hàm setAmount đơn giản
+function setAmount(amount) {
+    const input = document.getElementById('donateAmount');
+    if (input) {
+        input.value = amount;
+        input.focus();
+    }
+}
+
+// Giữ nguyên hàm setAmount nhưng thêm hiệu ứng
+function setAmount(amount) {
+    const amountInput = document.getElementById('donateAmount');
+    if (amountInput) {
+        amountInput.value = amount;
+        
+        // Highlight selected button
+        document.querySelectorAll('.amount-btn').forEach(btn => {
+            btn.classList.remove('active');
+            btn.style.background = '';
+            btn.style.color = '';
+            
+            if (parseInt(btn.dataset.amount) === amount) {
+                btn.classList.add('active');
+                btn.style.background = '#2196F3';
+                btn.style.color = 'white';
+                btn.style.boxShadow = '0 3px 10px rgba(33, 150, 243, 0.3)';
+            }
+        });
+        
+        // Highlight input
+        amountInput.style.borderColor = '#2196F3';
+        amountInput.style.backgroundColor = 'rgba(33, 150, 243, 0.1)';
+        
+        // Auto-remove highlight after 2 seconds
+        setTimeout(() => {
+            amountInput.style.borderColor = '';
+            amountInput.style.backgroundColor = '';
+        }, 2000);
+    }
+}
+
 function submitDonation() {
-    const name = document.getElementById('donateName').value.trim();
-    const email = document.getElementById('donateEmail').value.trim();
-    const amount = document.getElementById('donateAmount').value;
-    const message = document.getElementById('donateMessage').value.trim();
+    // Lấy giá trị - xử lý cho cả 2 trường hợp (đã login/chưa login)
+    const amountInput = document.getElementById('donateAmount');
+    const amount = amountInput ? amountInput.value : '';
     
-    // Validate
-    if (!name || !email || !amount) {
-        showNotification('Please fill in all required fields', 'error');
+    let name = '', email = '';
+    
+    if (currentUser) {
+        // Đã đăng nhập: tự động lấy thông tin
+        name = currentUser.username;
+        email = currentUser.email || '';
+    } else {
+        // Chưa đăng nhập: lấy từ form
+        const nameInput = document.getElementById('donateName');
+        const emailInput = document.getElementById('donateEmail');
+        name = nameInput ? nameInput.value.trim() : '';
+        email = emailInput ? emailInput.value.trim() : '';
+    }
+    
+    const messageInput = document.getElementById('donateMessage');
+    const message = messageInput ? messageInput.value.trim() : '';
+    
+    // VALIDATION NGẮN GỌN
+    const amountNum = parseFloat(amount);
+    if (!amount || isNaN(amountNum) || amountNum < 1) {
+        showNotification('Vui lòng nhập số tiền ≥ $1.00', 'error');
+        if (amountInput) amountInput.focus();
         return;
     }
     
-    if (parseFloat(amount) <= 0) {
-        showNotification('Please enter a valid donation amount', 'error');
-        return;
-    }
-    
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
-        showNotification('Please enter a valid email address', 'error');
-        return;
+    if (!currentUser) {
+        if (!name || name.length < 2) {
+            showNotification('Vui lòng nhập tên (ít nhất 2 ký tự)', 'error');
+            document.getElementById('donateName')?.focus();
+            return;
+        }
+        
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+            showNotification('Email không hợp lệ', 'error');
+            document.getElementById('donateEmail')?.focus();
+            return;
+        }
     }
     
     // Tạo donation data
     const donationData = {
         name: name,
         email: email,
-        amount: parseFloat(amount),
+        amount: amountNum.toFixed(2),
         message: message,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        userId: currentUser ? currentUser._id : null,
+        donationId: 'D' + Date.now().toString().slice(-6)
     };
     
-    console.log('Submitting donation:', donationData);
-    
-    // Ở ĐÂY SẼ GỬI ĐẾN BACKEND API
-    // axios.post('/api/donate', donationData)
-    //     .then(response => {
-    //         // Hiển thị QR code từ backend
-    //         showQRCode(response.data.qrCode);
-    //     })
-    //     .catch(error => {
-    //         showNotification('Payment failed. Please try again.', 'error');
-    //     });
-    
-    // Tạm thời hiển thị QR mẫu (DEMO)
+    // Hiển thị QR
     showQRCodeDemo(donationData);
+    
+    // Thông báo
+    showNotification(`Đã tạo đóng góp $${donationData.amount}`, 'success');
 }
 
-// Hiển thị QR code (DEMO)
+// Hàm showQRCodeDemo compact
+function showQRCodeDemo(donationData) {
+    const form = document.getElementById('donateForm');
+    const qrContainer = document.getElementById('qrCodeContainer');
+    
+    if (form && qrContainer) {
+        form.style.display = 'none';
+        qrContainer.style.display = 'block';
+        
+        // Update QR info
+        document.getElementById('qrAmount').textContent = donationData.amount;
+        document.getElementById('qrId').textContent = donationData.donationId;
+        
+        // Auto scroll to QR
+        qrContainer.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+}
+
+
+// Thêm hàm validate mới vào main.js
+function validateDonationForm(name, email, amount) {
+    const errors = [];
+    
+    // Kiểm tra tên
+    if (!name || name.trim().length === 0) {
+        errors.push('Vui lòng nhập tên');
+    } else if (name.length < 2) {
+        errors.push('Tên phải có ít nhất 2 ký tự');
+    } else if (name.length > 50) {
+        errors.push('Tên không được vượt quá 50 ký tự');
+    }
+    
+    // Kiểm tra email
+    if (!email || email.trim().length === 0) {
+        errors.push('Vui lòng nhập email');
+    } else {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            errors.push('Email không hợp lệ');
+        }
+    }
+    
+    // Kiểm tra số tiền
+    if (!amount || amount.trim().length === 0) {
+        errors.push('Vui lòng nhập số tiền');
+    } else {
+        const amountNum = parseFloat(amount);
+        if (isNaN(amountNum)) {
+            errors.push('Số tiền không hợp lệ');
+        } else if (amountNum < 1) {
+            errors.push('Số tiền tối thiểu là $1.00');
+        } else if (amountNum > 10000) {
+            errors.push('Số tiền tối đa là $10,000.00');
+        }
+    }
+    
+    return {
+        isValid: errors.length === 0,
+        errors: errors
+    };
+}
+
+// Cập nhật hàm submitDonation() để sử dụng validate mới
+function submitDonation() {
+    const name = document.getElementById('donateName').value.trim();
+    const email = document.getElementById('donateEmail').value.trim();
+    const amount = document.getElementById('donateAmount').value;
+    const message = document.getElementById('donateMessage').value.trim();
+    
+    // Validate form
+    const validation = validateDonationForm(name, email, amount);
+    
+    if (!validation.isValid) {
+        // Hiển thị tất cả lỗi
+        validation.errors.forEach(error => {
+            showNotification(error, 'error');
+        });
+        return;
+    }
+    
+    // Nếu chưa đăng nhập và email không khớp với định dạng
+    if (!currentUser) {
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(email)) {
+            showNotification('Email không hợp lệ. Vui lòng kiểm tra lại', 'error');
+            document.getElementById('donateEmail').focus();
+            return;
+        }
+    }
+    
+    const amountNum = parseFloat(amount);
+    
+    // Tạo donation data
+    const donationData = {
+        name: name,
+        email: email,
+        amount: amountNum.toFixed(2),
+        message: message,
+        timestamp: Date.now(),
+        userId: currentUser ? currentUser._id : null,
+        username: currentUser ? currentUser.username : null,
+        status: 'pending',
+        donationId: 'DON' + Date.now().toString().slice(-8)
+    };
+    
+    console.log('✅ Donation data validated:', donationData);
+    
+    // Hiển thị loading
+    showNotification('🔄 Đang xử lý đóng góp của bạn...', 'info');
+    
+    // Giả lập gửi đến backend
+    setTimeout(() => {
+        // Lưu vào lịch sử donation
+        saveDonationToHistory(donationData);
+        
+        // Hiển thị QR code
+        showQRCodeDemo(donationData);
+        
+        // Thông báo thành công
+        showNotification('✅ Đóng góp thành công! Cảm ơn bạn đã hỗ trợ!', 'success');
+        
+        // Log để debug
+        console.log('🎉 Donation completed:', donationData);
+        
+    }, 1500);
+}
+
+// Cập nhật hàm showQRCodeDemo() để hiển thị thông tin chi tiết hơn
+// Cập nhật hàm showQRCodeDemo cho compact version
 function showQRCodeDemo(donationData) {
     const qrContainer = document.getElementById('qrCodeContainer');
     const form = document.getElementById('donateForm');
     
     if (qrContainer && form) {
-        // Ẩn form, hiện QR
-        form.style.display = 'none';
-        qrContainer.style.display = 'block';
+        // Ẩn form, hiện QR với animation
+        form.style.opacity = '0';
+        form.style.height = '0';
+        form.style.overflow = 'hidden';
+        form.style.transition = 'all 0.3s ease';
         
-        // Tạo QR code demo (thực tế sẽ lấy từ backend)
-        const qrContent = `
-            <div style="text-align: center; padding: 20px;">
-                <div style="background: white; width: 200px; height: 200px; margin: 0 auto 20px; display: flex; align-items: center; justify-content: center; border-radius: 10px;">
-                    <div style="color: black; font-size: 1rem;">
-                        <div style="font-weight: bold; margin-bottom: 10px;">QR CODE</div>
-                        <div>Amount: $${donationData.amount}</div>
-                        <div>From: ${donationData.name}</div>
+        setTimeout(() => {
+            form.style.display = 'none';
+            qrContainer.style.display = 'block';
+            qrContainer.style.animation = 'modalFadeIn 0.5s ease';
+            
+            // Tạo QR code đơn giản
+            const qrContent = `
+                <div style="color: black; text-align: center; font-family: monospace;">
+                    <div style="font-weight: bold; margin-bottom: 5px; color: #2196F3; font-size: 0.9rem;">
+                        QR PAYMENT
+                    </div>
+                    <div style="font-size: 0.8rem; margin-bottom: 5px;">
+                        <div style="font-weight: bold; color: #333;">$${donationData.amount}</div>
+                        <div style="color: #666; font-size: 0.7rem;">ID: ${donationData.donationId}</div>
+                    </div>
+                    <div style="width: 120px; height: 120px; margin: 5px auto; 
+                                background: repeating-linear-gradient(45deg, 
+                                #000 0px, #000 1px, 
+                                transparent 1px, transparent 20px),
+                                repeating-linear-gradient(-45deg, 
+                                #000 0px, #000 1px, 
+                                transparent 1px, transparent 20px);
+                                border: 1px solid #333;">
+                        <!-- QR pattern simulation -->
+                        <div style="width: 20px; height: 20px; background: #000; position: absolute; top: 10px; left: 10px;"></div>
+                        <div style="width: 20px; height: 20px; background: #000; position: absolute; top: 10px; right: 10px;"></div>
+                        <div style="width: 20px; height: 20px; background: #000; position: absolute; bottom: 10px; left: 10px;"></div>
+                    </div>
+                    <div style="color: #666; font-size: 0.7rem; margin-top: 5px;">
+                        Scan with bank app
                     </div>
                 </div>
-                <div style="color: white; margin-top: 15px;">
-                    <p><i class="fas fa-info-circle"></i> Scan this code with your banking app</p>
-                    <p><small>Donation ID: ${Date.now().toString(36).toUpperCase()}</small></p>
-                </div>
-            </div>
-        `;
-        
-        document.getElementById('qrCodeImage').innerHTML = qrContent;
-        
-        // Lưu donation vào localStorage (tạm thời)
-        saveDonationToHistory(donationData);
+            `;
+            
+            document.getElementById('qrCodeImage').innerHTML = qrContent;
+            
+            // Cập nhật thông tin chi tiết
+            document.getElementById('qrName').textContent = donationData.name;
+            document.getElementById('qrAmount').textContent = donationData.amount;
+            document.getElementById('qrId').textContent = donationData.donationId;
+            
+        }, 300);
     }
 }
 
-// Lưu donation vào history (tạm thời)
+// Cập nhật hàm saveDonationToHistory
 function saveDonationToHistory(donationData) {
-    const donations = JSON.parse(localStorage.getItem('pickleball_donations') || '[]');
-    donations.push({
-        ...donationData,
-        id: Date.now(),
-        status: 'pending'
-    });
-    localStorage.setItem('pickleball_donations', JSON.stringify(donations));
+    try {
+        const donations = JSON.parse(localStorage.getItem('pickleball_donations') || '[]');
+        
+        // Thêm thông tin bổ sung
+        const completeDonation = {
+            ...donationData,
+            id: Date.now(),
+            status: 'completed',
+            completedAt: new Date().toISOString(),
+            isVerified: true
+        };
+        
+        donations.push(completeDonation);
+        localStorage.setItem('pickleball_donations', JSON.stringify(donations));
+        
+        console.log('💾 Donation saved to history:', completeDonation);
+        return true;
+    } catch (error) {
+        console.error('❌ Failed to save donation:', error);
+        return false;
+    }
 }
 
-// Utility functions
+// Thêm hàm real-time validation cho donation form
+function setupDonationFormValidation() {
+    const amountInput = document.getElementById('donateAmount');
+    const nameInput = document.getElementById('donateName');
+    const emailInput = document.getElementById('donateEmail');
+    
+    if (amountInput) {
+        amountInput.addEventListener('input', function() {
+            const value = parseFloat(this.value);
+            if (!isNaN(value) && value < 1) {
+                this.style.borderColor = '#ff4757';
+                this.style.backgroundColor = 'rgba(255, 71, 87, 0.1)';
+            } else {
+                this.style.borderColor = '';
+                this.style.backgroundColor = '';
+            }
+        });
+    }
+    
+    if (emailInput && !currentUser) {
+        emailInput.addEventListener('blur', function() {
+            const email = this.value.trim();
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            
+            if (email && !emailRegex.test(email)) {
+                this.style.borderColor = '#ff4757';
+                this.style.backgroundColor = 'rgba(255, 71, 87, 0.1)';
+                showNotification('Email không đúng định dạng', 'error');
+            }
+        });
+    }
+}
+
+// Gọi hàm setup trong showDonateForm()
+// Thêm dòng này vào cuối hàm showDonateForm():
+setTimeout(setupDonationFormValidation, 500);
+
+// ============ UTILITY FUNCTIONS (GIỮ NGUYÊN) ============
 function escapeHtml(text) {
     const div = document.createElement('div');
     div.textContent = text;
@@ -1531,7 +1701,6 @@ function setupSmoothScroll() {
 }
 
 function showNotification(message, type = 'info') {
-    // Create notification element
     const notification = document.createElement('div');
     notification.className = `notification ${type}`;
     notification.innerHTML = `
@@ -1542,7 +1711,6 @@ function showNotification(message, type = 'info') {
         <button class="notification-close" onclick="this.parentElement.remove()">×</button>
     `;
     
-    // Add styles
     notification.style.cssText = `
         position: fixed;
         top: 20px;
@@ -1563,7 +1731,6 @@ function showNotification(message, type = 'info') {
     
     document.body.appendChild(notification);
     
-    // Auto remove after 5 seconds
     setTimeout(() => {
         if (notification.parentElement) {
             notification.remove();
@@ -1571,112 +1738,22 @@ function showNotification(message, type = 'info') {
     }, 5000);
 }
 
-// Slider functions
-function prevUpdate() {
-    if (isShowingAllUpdates) return;
-    
-    const updates = JSON.parse(localStorage.getItem('pickleball_updates') || '[]');
-    if (updates.length <= 1) return;
-    
-    currentUpdateIndex = (currentUpdateIndex - 1 + updates.length) % updates.length;
-    renderUpdateSlider(updates);
-}
-
-function nextUpdate() {
-    if (isShowingAllUpdates) return;
-    
-    const updates = JSON.parse(localStorage.getItem('pickleball_updates') || '[]');
-    if (updates.length <= 1) return;
-    
-    currentUpdateIndex = (currentUpdateIndex + 1) % updates.length;
-    renderUpdateSlider(updates);
-}
-
-function toggleShowAll() {
-    const updates = JSON.parse(localStorage.getItem('pickleball_updates') || '[]');
-    isShowingAllUpdates = !isShowingAllUpdates;
-    currentUpdateIndex = 0;
-    
-    // Update button text
-    const showAllBtn = document.getElementById('showAllUpdates');
-    if (showAllBtn) {
-        showAllBtn.innerHTML = isShowingAllUpdates ? 
-            '<i class="fas fa-times"></i> Show Single' : 
-            '<i class="fas fa-list"></i> Show All';
-    }
-    
-    renderUpdateSlider(updates);
-}
-
-function goToSlide(index) {
-    if (isShowingAllUpdates) return;
-    
-    const updates = JSON.parse(localStorage.getItem('pickleball_updates') || '[]');
-    if (index >= 0 && index < updates.length) {
-        currentUpdateIndex = index;
-        renderUpdateSlider(updates);
-    }
-}
-
-// Kiểm tra session tự động
-function checkSession() {
-    const sessionUsername = localStorage.getItem('pickleball_session');
-    if (sessionUsername && !currentUser) {
-        console.log('Auto-reloading session...');
-        loadSession();
-        updateAuthUI();
-    }
-}
-
-// Kiểm tra mỗi 2 giây
-setInterval(checkSession, 2000);
-
-// Gọi ngay khi load
-document.addEventListener('DOMContentLoaded', function() {
-    initializePage();
-    
-    // Auto check after 1 second
-    setTimeout(checkSession, 1000);
-});
-// Email validation function
-function isValidEmail(email) {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-}
 function resetAuthForm() {
     document.getElementById('authUsername').value = '';
     document.getElementById('authEmail').value = '';
     document.getElementById('authPassword').value = '';
     document.getElementById('authError').textContent = '';
     
-    // Remove error classes
     document.querySelectorAll('.auth-form input').forEach(input => {
         input.classList.remove('error');
     });
 }
 
-function toggleAuthMode() {
-    const currentMode = document.getElementById('modalTitle').textContent.includes('Sign up') ? 'signup' : 'login';
-    
-    // Reset form trước khi chuyển mode
-    resetAuthForm();
-    
-    // Hiển thị modal với mode mới
-    showAuthModal(currentMode === 'login' ? 'signup' : 'login');
+function isValidEmail(email) {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
 }
 
-function toggleAuthMode() {
-    const currentMode = document.getElementById('modalTitle').textContent.includes('Sign up') ? 'signup' : 'login';
-    
-    // Reset form trước khi chuyển mode
-    resetAuthForm();
-    
-    // Hiển thị modal với mode mới
-    showAuthModal(currentMode === 'login' ? 'signup' : 'login');
-}
-// Thêm vào cuối file main.js
-
-// Hàm chặn scroll hoàn toàn
 function preventDefaultScroll(e) {
     if (isFullscreen) {
         e.preventDefault();
@@ -1685,11 +1762,10 @@ function preventDefaultScroll(e) {
     }
 }
 
-// Thêm event listeners để chặn scroll
+// ============ EVENT LISTENERS ============
 document.addEventListener('wheel', preventDefaultScroll, { passive: false });
 document.addEventListener('touchmove', preventDefaultScroll, { passive: false });
 document.addEventListener('keydown', function(e) {
-    // Chặn phím space, page up/down, arrow keys khi fullscreen
     if (isFullscreen && 
         (e.code === 'Space' || 
          e.code === 'PageUp' || 
@@ -1702,30 +1778,47 @@ document.addEventListener('keydown', function(e) {
     }
 });
 
-// Tìm đoạn code cũ và thay thế bằng đoạn này:
-
-playBtn.addEventListener('click', () => {
-    // 1. Ẩn thumbnail, hiện game
-    thumbnailContainer.style.display = 'none';
-    gameContainer.style.display = 'block';
-
-    // 2. Yêu cầu Fullscreen trên CONTAINER CHA (quan trọng!)
-    if (gameContainer.requestFullscreen) {
-        gameContainer.requestFullscreen().catch(err => {
-            console.log("Lỗi fullscreen: ", err);
-            // Fallback nếu API bị chặn (đặc biệt trên iOS)
-            enablePseudoFullscreen(); 
-        });
-    } else if (gameContainer.webkitRequestFullscreen) { // Safari/Chrome cũ
-        gameContainer.webkitRequestFullscreen();
-    } else {
-        // Trường hợp trình duyệt không hỗ trợ API (ví dụ iPhone)
-        enablePseudoFullscreen();
-    }
+// ============ INITIALIZE ON LOAD ============
+document.addEventListener('DOMContentLoaded', function() {
+    initializePage();
+    
+    // Make functions globally available
+    window.handleAuthSubmit = handleAuthSubmit;
+    window.submitComment = submitComment;
+    window.submitReply = submitReply;
+    window.deleteComment = deleteComment;
+    window.submitUpdate = submitUpdate;
+    window.submitEditUpdate = submitEditUpdate;
+    window.deleteUpdate = deleteUpdate;
+    window.banUser = banUser;
+    window.promoteUser = promoteUser;
+    window.deleteUser = deleteUser;
+    window.showAuthModal = showAuthModal;
+    window.closeAuthModal = closeAuthModal;
+    window.toggleAuthMode = toggleAuthMode;
+    window.logout = logout;
+    window.startGame = startGame;
+    window.exitGame = exitGame;
+    window.toggleFullscreen = toggleFullscreen;
+    window.showDonateForm = showDonateForm;
+    window.setAmount = setAmount;
+    window.submitDonation = submitDonation;
+    window.prevUpdate = prevUpdate;
+    window.nextUpdate = nextUpdate;
+    window.toggleShowAll = toggleShowAll;
+    window.goToSlide = goToSlide;
+    window.filterUpdates = filterUpdates;
+    window.nextPreviewUpdate = nextPreviewUpdate;
+    window.prevPreviewUpdate = prevPreviewUpdate;
+    window.toggleReplyForm = toggleReplyForm;
+    window.cancelReply = cancelReply;
+    window.clearCommentInput = clearCommentInput;
 });
 
-// Hàm "Giả lập" Fullscreen cho mobile (CSS Only)
-function enablePseudoFullscreen() {
-    gameContainer.classList.add('pseudo-fullscreen');
-    document.body.style.overflow = 'hidden'; // Khóa cuộn trang
-}
+// Auto-check session
+setInterval(() => {
+    if (window.userSystem && window.userSystem.isLoggedIn() && !currentUser) {
+        currentUser = window.userSystem.getUser();
+        updateAuthUI();
+    }
+}, 2000);

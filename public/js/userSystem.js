@@ -1,51 +1,23 @@
-// userSystem.js - SIMPLIFIED API CLIENT FOR FRONTEND
+// userSystem.js - UPDATED FOR REAL API CONNECTION
 class UserSystem {
     constructor() {
-        this.API_BASE = 'http://localhost:3000/api';
+        // ĐỔI THÀNH URL BACKEND THẬT CỦA BẠN
+        this.API_BASE = 'https://backend-api-service-cyxi.onrender.com/api'; 
+        // Hoặc local: 'http://localhost:5000/api'
+        
         this.token = localStorage.getItem('pickleball_token');
         this.currentUser = null;
         
-        // Load user from token if exists
         if (this.token) {
             this.loadUserFromToken();
         }
     }
 
-    // ============ LOAD USER FROM TOKEN ============
-    async loadUserFromToken() {
-        if (!this.token) return;
-        
-        try {
-            const response = await fetch(`${this.API_BASE}/verify-token`, {
-                headers: {
-                    'Authorization': `Bearer ${this.token}`
-                }
-            });
-            
-            if (response.ok) {
-                const data = await response.json();
-                if (data.user) {
-                    this.currentUser = data.user;
-                }
-            } else {
-                // Token invalid, clear it
-                this.clearToken();
-            }
-        } catch (error) {
-            console.error('Failed to verify token:', error);
-            this.clearToken();
-        }
-    }
-
-    // ============ CLEAR TOKEN ============
-    clearToken() {
-        this.token = null;
-        this.currentUser = null;
-        localStorage.removeItem('pickleball_token');
-    }
-
     // ============ API CALL METHOD ============
     async apiCall(endpoint, method = 'GET', data = null) {
+        const url = `${this.API_BASE}${endpoint}`;
+        console.log(`📡 API Call: ${method} ${url}`, data);
+        
         const options = {
             method: method,
             headers: {
@@ -64,12 +36,14 @@ class UserSystem {
         }
 
         try {
-            const response = await fetch(`${this.API_BASE}${endpoint}`, options);
+            const response = await fetch(url, options);
             const result = await response.json();
+            
+            console.log(`📡 API Response ${endpoint}:`, result);
             
             if (!response.ok) {
                 // If unauthorized, clear token
-                if (response.status === 401) {
+                if (response.status === 401 || response.status === 403) {
                     this.clearToken();
                 }
                 throw new Error(result.error || `HTTP ${response.status}`);
@@ -77,16 +51,21 @@ class UserSystem {
             
             return result;
         } catch (error) {
-            console.error('API Error:', error.message);
+            console.error(`❌ API Error ${endpoint}:`, error.message);
+            
+            // Show user-friendly error
+            if (error.message.includes('Failed to fetch')) {
+                throw new Error('Cannot connect to server. Please check your connection.');
+            }
+            
             throw error;
         }
     }
 
-    // ============ AUTHENTICATION METHODS ============
-    
-    async signUp(username, email, password) {
+    // ============ AUTH METHODS ============
+    async register(username, email, password) {
         try {
-            const result = await this.apiCall('/signup', 'POST', {
+            const result = await this.apiCall('/auth/register', 'POST', {
                 username,
                 email,
                 password
@@ -102,14 +81,14 @@ class UserSystem {
         } catch (error) {
             return {
                 success: false,
-                message: error.message
+                error: error.message
             };
         }
     }
 
-    async signIn(email, password) {
+    async login(email, password) {
         try {
-            const result = await this.apiCall('/signin', 'POST', {
+            const result = await this.apiCall('/auth/login', 'POST', {
                 email,
                 password
             });
@@ -124,74 +103,50 @@ class UserSystem {
         } catch (error) {
             return {
                 success: false,
-                message: error.message
+                error: error.message
             };
         }
     }
 
-    async signOut() {
+    async logout() {
         try {
-            await this.apiCall('/signout', 'POST');
+            await this.apiCall('/auth/logout', 'POST');
         } catch (error) {
-            console.error('Sign out error:', error);
+            console.log('Logout error (ignored):', error);
         } finally {
             this.clearToken();
         }
         
-        return { success: true, message: "Signed out successfully!" };
+        return { success: true, message: "Logged out successfully!" };
     }
 
-    // ============ USER METHODS ============
-    
-    async getProfile() {
-        try {
-            const result = await this.apiCall('/profile', 'GET');
-            return result;
-        } catch (error) {
-            return { success: false, error: error.message };
-        }
-    }
-
-    async isAdmin() {
-        if (!this.currentUser) return false;
-        
-        try {
-            const result = await this.apiCall('/check-admin', 'GET');
-            return result.isAdmin || false;
-        } catch (error) {
-            return this.currentUser.isAdmin || false;
-        }
-    }
-
-    // ============ COMMENTS METHODS ============
-    
+    // ============ COMMENT METHODS ============
     async getComments() {
         try {
             const result = await this.apiCall('/comments', 'GET');
             return result;
         } catch (error) {
             console.error('Failed to load comments:', error);
-            return { comments: [] };
+            return { 
+                success: false, 
+                error: error.message,
+                data: [] 
+            };
         }
     }
 
-    async postComment(content) {
+    async postComment(content, parentCommentId = null) {
         try {
-            const result = await this.apiCall('/comments', 'POST', { content });
-            return result;
-        } catch (error) {
-            return { success: false, error: error.message };
-        }
-    }
-
-    async voteComment(commentId, voteType) {
-        try {
-            const result = await this.apiCall(`/comments/${commentId}/vote`, 'POST', { 
-                vote: voteType 
+            const result = await this.apiCall('/comments', 'POST', { 
+                content, 
+                parentCommentId 
             });
             return result;
         } catch (error) {
-            return { success: false, error: error.message };
+            return { 
+                success: false, 
+                error: error.message 
+            };
         }
     }
 
@@ -200,23 +155,29 @@ class UserSystem {
             const result = await this.apiCall(`/comments/${commentId}`, 'DELETE');
             return result;
         } catch (error) {
-            return { success: false, error: error.message };
+            return { 
+                success: false, 
+                error: error.message 
+            };
         }
     }
 
-    // ============ UPDATES METHODS ============
-    
+    // ============ UPDATE METHODS ============
     async getUpdates() {
         try {
             const result = await this.apiCall('/updates', 'GET');
             return result;
         } catch (error) {
             console.error('Failed to load updates:', error);
-            return { updates: [] };
+            return { 
+                success: false, 
+                error: error.message,
+                data: [] 
+            };
         }
     }
 
-    async postUpdate(title, content) {
+    async createUpdate(title, content) {
         try {
             const result = await this.apiCall('/updates', 'POST', { 
                 title, 
@@ -224,7 +185,10 @@ class UserSystem {
             });
             return result;
         } catch (error) {
-            return { success: false, error: error.message };
+            return { 
+                success: false, 
+                error: error.message 
+            };
         }
     }
 
@@ -236,7 +200,10 @@ class UserSystem {
             });
             return result;
         } catch (error) {
-            return { success: false, error: error.message };
+            return { 
+                success: false, 
+                error: error.message 
+            };
         }
     }
 
@@ -245,41 +212,94 @@ class UserSystem {
             const result = await this.apiCall(`/updates/${updateId}`, 'DELETE');
             return result;
         } catch (error) {
-            return { success: false, error: error.message };
+            return { 
+                success: false, 
+                error: error.message 
+            };
         }
     }
 
     // ============ ADMIN METHODS ============
-    
     async getUsers() {
         try {
-            const result = await this.apiCall('/users', 'GET');
+            const result = await this.apiCall('/admin/users', 'GET');
             return result;
         } catch (error) {
-            return { success: false, error: error.message };
+            return { 
+                success: false, 
+                error: error.message 
+            };
+        }
+    }
+
+    async getStats() {
+        try {
+            const result = await this.apiCall('/admin/stats', 'GET');
+            return result;
+        } catch (error) {
+            return { 
+                success: false, 
+                error: error.message 
+            };
         }
     }
 
     async banUser(userId) {
         try {
-            const result = await this.apiCall(`/users/${userId}/ban`, 'PUT');
+            const result = await this.apiCall(`/admin/users/${userId}/ban`, 'PUT');
             return result;
         } catch (error) {
-            return { success: false, error: error.message };
+            return { 
+                success: false, 
+                error: error.message 
+            };
+        }
+    }
+
+    async promoteUser(userId) {
+        try {
+            const result = await this.apiCall(`/admin/users/${userId}/promote`, 'PUT');
+            return result;
+        } catch (error) {
+            return { 
+                success: false, 
+                error: error.message 
+            };
         }
     }
 
     async deleteUser(userId) {
         try {
-            const result = await this.apiCall(`/users/${userId}`, 'DELETE');
+            const result = await this.apiCall(`/admin/users/${userId}`, 'DELETE');
             return result;
         } catch (error) {
-            return { success: false, error: error.message };
+            return { 
+                success: false, 
+                error: error.message 
+            };
         }
     }
 
     // ============ UTILITY METHODS ============
-    
+    async loadUserFromToken() {
+        try {
+            const result = await this.apiCall('/auth/profile', 'GET');
+            if (result && result.username) {
+                this.currentUser = result;
+                console.log('✅ User loaded from token:', this.currentUser.username);
+            }
+        } catch (error) {
+            console.log('No valid token or failed to load user:', error);
+            this.clearToken();
+        }
+    }
+
+    clearToken() {
+        this.token = null;
+        this.currentUser = null;
+        localStorage.removeItem('pickleball_token');
+    }
+
     isLoggedIn() {
         return !!this.currentUser;
     }
@@ -292,18 +312,13 @@ class UserSystem {
         return this.token;
     }
 
-    // Check if user can delete comment (owner or admin)
-    canDeleteComment(commentAuthor) {
-        if (!this.currentUser) return false;
-        
-        return this.currentUser.username === commentAuthor || 
-               (this.currentUser.isAdmin !== undefined && this.currentUser.isAdmin);
+    isAdmin() {
+        return this.currentUser && this.currentUser.isAdmin;
     }
 
-    // Check if user can delete update (admin only)
-    canDeleteUpdate() {
+    canDeleteComment(commentAuthor) {
         if (!this.currentUser) return false;
-        return this.currentUser.isAdmin !== undefined && this.currentUser.isAdmin;
+        return this.currentUser.username === commentAuthor || this.isAdmin();
     }
 }
 
