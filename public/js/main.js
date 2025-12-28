@@ -135,16 +135,22 @@ async function handleAuthSubmit() {
     const isSignupMode = document.getElementById('modalTitle').textContent.includes('Sign up');
     const errorElement = document.getElementById('authError');
     errorElement.textContent = '';
+    errorElement.classList.remove('show');
+    
+    // Show loading
+    errorElement.textContent = 'Processing...';
+    errorElement.style.color = '#2196F3';
     
     try {
         if (isSignupMode) {
-            // SIGN UP với API
+            // SIGN UP
             const username = document.getElementById('authUsername').value.trim();
             const email = document.getElementById('authEmail').value.trim();
             const password = document.getElementById('authPassword').value;
             
             if (!username || !email || !password) {
                 errorElement.textContent = 'Please fill in all fields';
+                errorElement.classList.add('show');
                 return;
             }
             
@@ -159,14 +165,16 @@ async function handleAuthSubmit() {
                 showNotification('Account created successfully!', 'success');
             } else {
                 errorElement.textContent = result.error || 'Registration failed';
+                errorElement.classList.add('show');
             }
         } else {
-            // LOGIN với API
+            // LOGIN
             const email = document.getElementById('authEmail').value.trim();
             const password = document.getElementById('authPassword').value;
             
             if (!email || !password) {
                 errorElement.textContent = 'Please fill in all fields';
+                errorElement.classList.add('show');
                 return;
             }
             
@@ -181,10 +189,12 @@ async function handleAuthSubmit() {
                 showNotification('Logged in successfully!', 'success');
             } else {
                 errorElement.textContent = result.error || 'Login failed';
+                errorElement.classList.add('show');
             }
         }
     } catch (error) {
         errorElement.textContent = 'An error occurred. Please try again.';
+        errorElement.classList.add('show');
         console.error('Auth error:', error);
     }
 }

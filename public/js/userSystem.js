@@ -1,18 +1,15 @@
-// userSystem.js - UPDATED FOR REAL API CONNECTION
+// userSystem.js - FIXED UNDEFINED ERROR
 class UserSystem {
     constructor() {
-        // ĐỔI THÀNH URL BACKEND THẬT CỦA BẠN
-        this.API_BASE = 'https://backend-api-service-cyxi.onrender.com/api'; 
-        // Hoặc local: 'http://localhost:5000/api'
+        this.API_BASE = 'https://backend-api-service-cyxi.onrender.com/api';
         
         this.token = localStorage.getItem('pickleball_token');
         this.currentUser = null;
         
+        // Load user if token exists
         if (this.token) {
-            this.loadUserFromToken().then(() => {
-                console.log('✅ User loaded from token:', this.currentUser);
-            }).catch(() => {
-                console.log('❌ Failed to load user from token');
+            this.loadUserFromToken().catch(error => {
+                console.log('Failed to load user:', error);
                 this.clearToken();
             });
         }
@@ -21,16 +18,13 @@ class UserSystem {
     // ============ API CALL METHOD ============
     async apiCall(endpoint, method = 'GET', data = null) {
         const url = `${this.API_BASE}${endpoint}`;
-        console.log(`📡 API Call: ${method} ${url}`, data);
         
         const options = {
             method: method,
             headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json'
-            },
-            // Thêm credentials nếu cần
-            credentials: 'include'
+            }
         };
 
         // Add token if exists
@@ -43,36 +37,29 @@ class UserSystem {
         }
 
         try {
+            console.log(`📡 API Call: ${method} ${url}`);
+            
             const response = await fetch(url, options);
             
-            // Kiểm tra response status trước
             if (!response.ok) {
-                // Nếu unauthorized, clear token
+                const errorText = await response.text();
+                console.error(`❌ API Error ${response.status}:`, errorText);
+                
                 if (response.status === 401 || response.status === 403) {
                     this.clearToken();
                 }
                 
-                // Try to get error message from response
-                let errorMessage = `HTTP ${response.status}`;
-                try {
-                    const errorResult = await response.json();
-                    errorMessage = errorResult.error || errorResult.message || errorMessage;
-                } catch (e) {
-                    // Không parse được JSON
-                }
-                
-                throw new Error(errorMessage);
+                throw new Error(`HTTP ${response.status}: ${errorText.substring(0, 100)}`);
             }
             
             const result = await response.json();
-            console.log(`📡 API Response ${endpoint}:`, result);
-            
+            console.log(`✅ API Success ${endpoint}:`, result);
             return result;
+            
         } catch (error) {
             console.error(`❌ API Error ${endpoint}:`, error.message);
             
-            // Show user-friendly error
-            if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+            if (error.message.includes('Failed to fetch')) {
                 throw new Error('Cannot connect to server. Please check your connection.');
             }
             
@@ -89,44 +76,42 @@ class UserSystem {
                 password
             });
             
-            console.log('🔍 Register result:', result);
+            console.log('Register API result:', result);
             
-            if (result.token) {
+            // FIX: Check if result exists and has token
+            if (result && result.token) {
                 this.token = result.token;
-                localStorage.setItem('pickleball_token', result.token);
+                localStorage.setItem('pickleball_token', this.token);
                 
-                // Lấy thông tin user từ result.user hoặc result trực tiếp
+                // FIX: Safely get user data
                 const userData = result.user || result;
                 
                 this.currentUser = {
                     _id: userData._id || result._id,
                     username: userData.username || result.username,
                     email: userData.email || result.email,
-                    isAdmin: userData.isAdmin || result.isAdmin || false,
-                    createdAt: userData.createdAt || result.createdAt
+                    isAdmin: userData.isAdmin || result.isAdmin || false
                 };
                 
-                console.log('✅ Registration successful, user set:', this.currentUser);
+                localStorage.setItem('pickleball_user', JSON.stringify(this.currentUser));
                 
                 return {
                     success: true,
-                    message: result.message || 'Registration successful!',
+                    message: result.message || 'Registration successful',
                     user: this.currentUser,
                     token: result.token
                 };
             } else {
-                // Registration succeeded but no token (maybe email verification required)
+                // Registration failed
                 return {
-                    success: true,
-                    message: result.message || 'Registration successful! Please login.',
-                    requiresLogin: true
+                    success: false,
+                    error: result?.error || 'Registration failed. No token received.'
                 };
             }
         } catch (error) {
-            console.error('❌ Registration error:', error);
             return {
                 success: false,
-                error: error.message || 'Registration failed'
+                error: error.message
             };
         }
     }
@@ -138,14 +123,32 @@ class UserSystem {
                 password
             });
             
-            console.log('🔍 Login result:', result);
+            console.log('Login API result:', result);
+            
+            // FIX: Check if result exists
+            if (!result) {
+                return {
+                    success: false,
+                    error: 'No response from server'
+                };
+            }
             
             if (result.token) {
                 this.token = result.token;
-                localStorage.setItem('pickleball_token', result.token);
+                localStorage.setItem('pickleball_token', this.token);
                 
-                // Lấy thông tin user từ result
-                const userData = result.user || result;
+                // FIX: Handle both response formats
+                let userData;
+                if (result.user) {
+                    userData = result.user;
+                } else if (result._id) {
+                    userData = result;
+                } else {
+                    return {
+                        success: false,
+                        error: 'Invalid user data from server'
+                    };
+                }
                 
                 this.currentUser = {
                     _id: userData._id,
@@ -154,87 +157,80 @@ class UserSystem {
                     isAdmin: userData.isAdmin || false
                 };
                 
-                console.log('✅ Login successful, user set:', this.currentUser);
-                
-                // Lưu thêm thông tin user vào localStorage để dễ truy cập
                 localStorage.setItem('pickleball_user', JSON.stringify(this.currentUser));
                 
                 return {
                     success: true,
-                    message: result.message || 'Login successful!',
+                    message: result.message || 'Login successful',
                     user: this.currentUser,
                     token: result.token
+                };
+            } else if (result.error) {
+                // Login failed
+                return {
+                    success: false,
+                    error: result.error
                 };
             } else {
                 return {
                     success: false,
-                    error: 'No token received from server'
+                    error: 'Login failed. Unknown error.'
                 };
             }
         } catch (error) {
-            console.error('❌ Login error:', error);
+            console.error('Login error:', error);
             return {
                 success: false,
-                error: error.message || 'Login failed. Please check your credentials.'
+                error: error.message
             };
         }
     }
 
-    // ============ LOGOUT METHOD ============
     async logout() {
         try {
-            // Gọi API logout nếu backend hỗ trợ
-            if (this.token) {
-                try {
-                    await this.apiCall('/auth/logout', 'POST');
-                } catch (error) {
-                    console.log('Logout API call failed, but clearing local session');
-                }
-            }
-            
-            // Clear everything
+            // Clear local data
             this.clearToken();
             
-            // Xóa tất cả session data
-            localStorage.removeItem('pickleball_user');
-            localStorage.removeItem('pickleball_token');
-            
-            // Force reload để clean state
-            setTimeout(() => {
-                // Chỉ reload nếu cần thiết
-                if (window.location.pathname === '/') {
-                    window.location.reload();
-                }
-            }, 100);
-            
-            return { success: true, message: 'Logged out successfully' };
+            return { 
+                success: true, 
+                message: 'Logged out successfully' 
+            };
         } catch (error) {
-            console.error('Logout error:', error);
-            this.clearToken();
-            return { success: false, error: error.message };
+            return { 
+                success: false, 
+                error: error.message 
+            };
         }
     }
 
     // ============ SESSION MANAGEMENT ============
     async loadUserFromToken() {
         try {
-            // Trước tiên kiểm tra nếu có user trong localStorage
+            // Check localStorage first
             const savedUser = localStorage.getItem('pickleball_user');
             if (savedUser) {
-                this.currentUser = JSON.parse(savedUser);
-                console.log('✅ User loaded from localStorage:', this.currentUser);
-                return this.currentUser;
+                try {
+                    this.currentUser = JSON.parse(savedUser);
+                    console.log('✅ User loaded from localStorage');
+                    return this.currentUser;
+                } catch (e) {
+                    console.error('Failed to parse saved user:', e);
+                }
             }
             
-            // Nếu không, gọi API để lấy profile
             if (!this.token) {
-                throw new Error('No token available');
+                return null;
             }
             
+            // Call API to get profile
             const result = await this.apiCall('/auth/profile', 'GET');
-            console.log('🔍 Profile result:', result);
             
-            if (result && result.username) {
+            // FIX: Check if result exists
+            if (!result) {
+                throw new Error('No response from profile API');
+            }
+            
+            if (result._id && result.username) {
                 this.currentUser = {
                     _id: result._id,
                     username: result.username,
@@ -242,16 +238,15 @@ class UserSystem {
                     isAdmin: result.isAdmin || false
                 };
                 
-                // Lưu vào localStorage
                 localStorage.setItem('pickleball_user', JSON.stringify(this.currentUser));
                 
                 console.log('✅ User loaded from API:', this.currentUser.username);
                 return this.currentUser;
+            } else {
+                throw new Error('Invalid user data from server');
             }
-            
-            throw new Error('Invalid user data');
         } catch (error) {
-            console.log('❌ Failed to load user from token:', error.message);
+            console.error('Failed to load user from token:', error.message);
             this.clearToken();
             throw error;
         }
@@ -265,7 +260,6 @@ class UserSystem {
     }
 
     isLoggedIn() {
-        // Kiểm tra cả token và user object
         return !!(this.token && this.currentUser);
     }
 
@@ -281,10 +275,20 @@ class UserSystem {
         return this.currentUser && this.currentUser.isAdmin;
     }
 
-    // Các method còn lại giữ nguyên...
+    // ============ COMMENT METHODS ============
     async getComments() {
         try {
             const result = await this.apiCall('/comments', 'GET');
+            
+            // FIX: Handle empty response
+            if (!result) {
+                return {
+                    success: false,
+                    error: 'No response from server',
+                    data: []
+                };
+            }
+            
             return result;
         } catch (error) {
             console.error('Failed to load comments:', error);
@@ -298,10 +302,21 @@ class UserSystem {
 
     async postComment(content, parentCommentId = null) {
         try {
-            const result = await this.apiCall('/comments', 'POST', { 
-                content, 
-                parentCommentId 
-            });
+            const data = { content };
+            if (parentCommentId) {
+                data.parentCommentId = parentCommentId;
+            }
+            
+            const result = await this.apiCall('/comments', 'POST', data);
+            
+            // FIX: Check result
+            if (!result) {
+                return {
+                    success: false,
+                    error: 'No response from server'
+                };
+            }
+            
             return result;
         } catch (error) {
             return { 
@@ -314,6 +329,15 @@ class UserSystem {
     async deleteComment(commentId) {
         try {
             const result = await this.apiCall(`/comments/${commentId}`, 'DELETE');
+            
+            // FIX: Check result
+            if (!result) {
+                return {
+                    success: false,
+                    error: 'No response from server'
+                };
+            }
+            
             return result;
         } catch (error) {
             return { 
@@ -323,9 +347,20 @@ class UserSystem {
         }
     }
 
+    // ============ UPDATE METHODS ============
     async getUpdates() {
         try {
             const result = await this.apiCall('/updates', 'GET');
+            
+            // FIX: Handle empty response
+            if (!result) {
+                return {
+                    success: false,
+                    error: 'No response from server',
+                    data: []
+                };
+            }
+            
             return result;
         } catch (error) {
             console.error('Failed to load updates:', error);
@@ -343,6 +378,15 @@ class UserSystem {
                 title, 
                 content 
             });
+            
+            // FIX: Check result
+            if (!result) {
+                return {
+                    success: false,
+                    error: 'No response from server'
+                };
+            }
+            
             return result;
         } catch (error) {
             return { 
@@ -358,6 +402,15 @@ class UserSystem {
                 title, 
                 content 
             });
+            
+            // FIX: Check result
+            if (!result) {
+                return {
+                    success: false,
+                    error: 'No response from server'
+                };
+            }
+            
             return result;
         } catch (error) {
             return { 
@@ -370,6 +423,15 @@ class UserSystem {
     async deleteUpdate(updateId) {
         try {
             const result = await this.apiCall(`/updates/${updateId}`, 'DELETE');
+            
+            // FIX: Check result
+            if (!result) {
+                return {
+                    success: false,
+                    error: 'No response from server'
+                };
+            }
+            
             return result;
         } catch (error) {
             return { 
@@ -379,9 +441,19 @@ class UserSystem {
         }
     }
 
+    // ============ ADMIN METHODS ============
     async getUsers() {
         try {
             const result = await this.apiCall('/admin/users', 'GET');
+            
+            // FIX: Check result
+            if (!result) {
+                return {
+                    success: false,
+                    error: 'No response from server'
+                };
+            }
+            
             return result;
         } catch (error) {
             return { 
@@ -394,6 +466,15 @@ class UserSystem {
     async getStats() {
         try {
             const result = await this.apiCall('/admin/stats', 'GET');
+            
+            // FIX: Check result
+            if (!result) {
+                return {
+                    success: false,
+                    error: 'No response from server'
+                };
+            }
+            
             return result;
         } catch (error) {
             return { 
@@ -406,6 +487,15 @@ class UserSystem {
     async banUser(userId) {
         try {
             const result = await this.apiCall(`/admin/users/${userId}/ban`, 'PUT');
+            
+            // FIX: Check result
+            if (!result) {
+                return {
+                    success: false,
+                    error: 'No response from server'
+                };
+            }
+            
             return result;
         } catch (error) {
             return { 
@@ -418,6 +508,15 @@ class UserSystem {
     async promoteUser(userId) {
         try {
             const result = await this.apiCall(`/admin/users/${userId}/promote`, 'PUT');
+            
+            // FIX: Check result
+            if (!result) {
+                return {
+                    success: false,
+                    error: 'No response from server'
+                };
+            }
+            
             return result;
         } catch (error) {
             return { 
@@ -430,6 +529,15 @@ class UserSystem {
     async deleteUser(userId) {
         try {
             const result = await this.apiCall(`/admin/users/${userId}`, 'DELETE');
+            
+            // FIX: Check result
+            if (!result) {
+                return {
+                    success: false,
+                    error: 'No response from server'
+                };
+            }
+            
             return result;
         } catch (error) {
             return { 
