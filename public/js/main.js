@@ -11,10 +11,21 @@ let scrollPosition = 0;
 async function initializePage() {
     console.log('🔄 Initializing page...');
     
-    // Load session từ token
-    if (window.userSystem && window.userSystem.isLoggedIn()) {
+    // Đợi userSystem khởi tạo xong
+    if (window.userSystem) {
+        // Kiểm tra nếu có token nhưng chưa load user
+        if (window.userSystem.token && !window.userSystem.currentUser) {
+            try {
+                await window.userSystem.loadUserFromToken();
+            } catch (error) {
+                console.log('Failed to load user from token, clearing session');
+                window.userSystem.clearToken();
+            }
+        }
+        
+        // Lấy user từ userSystem
         currentUser = window.userSystem.getUser();
-        console.log('✅ User loaded from token:', currentUser?.username);
+        console.log('✅ User loaded:', currentUser?.username || 'No user');
     }
     
     // Update UI
@@ -24,7 +35,7 @@ async function initializePage() {
     await loadComments();
     await loadUpdates();
     
-    // Setup event listeners (giữ nguyên)
+    // Setup event listeners
     setupSmoothScroll();
     setupFullscreenListener();
     setupOrientationListener();
@@ -85,6 +96,40 @@ function toggleAuthMode() {
     showAuthModal(currentMode === 'login' ? 'signup' : 'login');
 }
 
+// ============ LOADING FUNCTIONS ============
+function showLoading(message = 'Loading...') {
+    let overlay = document.getElementById('globalLoading');
+    
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'globalLoading';
+        overlay.className = 'loading-overlay';
+        overlay.innerHTML = `
+            <div style="text-align: center; color: white;">
+                <div class="loading-spinner"></div>
+                <div style="margin-top: 20px;">${message}</div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+    }
+    
+    setTimeout(() => {
+        overlay.classList.add('active');
+    }, 10);
+}
+
+function hideLoading() {
+    const overlay = document.getElementById('globalLoading');
+    if (overlay) {
+        overlay.classList.remove('active');
+        setTimeout(() => {
+            if (overlay.parentElement) {
+                overlay.remove();
+            }
+        }, 300);
+    }
+}   
+
 // ============ AUTHENTICATION (UPDATED FOR API) ============
 async function handleAuthSubmit() {
     const isSignupMode = document.getElementById('modalTitle').textContent.includes('Sign up');
@@ -144,6 +189,7 @@ async function handleAuthSubmit() {
     }
 }
 
+// ============ UPDATE AUTH UI FUNCTION ============
 function updateAuthUI() {
     const authButtons = document.getElementById('authButtons');
     const userProfile = document.getElementById('userProfile');
@@ -153,15 +199,19 @@ function updateAuthUI() {
     const loginToComment = document.getElementById('loginToComment');
     const commentInputSection = document.getElementById('commentInputSection');
     
-    if (currentUser) {
+    // Sử dụng currentUser từ global hoặc từ userSystem
+    const user = currentUser || window.userSystem.getUser();
+    
+    if (user && user.username) {
+        // User đã login
         authButtons.style.display = 'none';
         userProfile.style.display = 'flex';
-        usernameDisplay.textContent = currentUser.username;
-        userAvatar.textContent = currentUser.username.charAt(0).toUpperCase();
+        usernameDisplay.textContent = user.username;
+        userAvatar.textContent = user.username.charAt(0).toUpperCase();
         
         // Kiểm tra admin status
-        if (currentUser.isAdmin || currentUser.admin) {
-            usernameDisplay.innerHTML = `${currentUser.username} <span class="admin-badge">(admin)</span>`;
+        if (user.isAdmin) {
+            usernameDisplay.innerHTML = `${user.username} <span class="admin-badge">(admin)</span>`;
             userAvatar.classList.add('admin-avatar');
             adminPanel.style.display = 'block';
         } else {
@@ -173,9 +223,11 @@ function updateAuthUI() {
         if (loginToComment) loginToComment.style.display = 'none';
         if (commentInputSection) commentInputSection.style.display = 'block';
     } else {
+        // Chưa login
         authButtons.style.display = 'flex';
         userProfile.style.display = 'none';
         adminPanel.style.display = 'none';
+        userAvatar.classList.remove('admin-avatar');
         
         // Show login prompt
         if (loginToComment) loginToComment.style.display = 'block';
@@ -183,21 +235,56 @@ function updateAuthUI() {
     }
     
     // Render lại để cập nhật UI
-    renderComments();
-    renderUpdates();
+    if (window.renderComments) renderComments();
+    if (window.renderUpdates) renderUpdates();
 }
 
+
+// ============ LOGOUT FUNCTION ============
 async function logout() {
     showCustomConfirm(
         'Logout',
         'Are you sure you want to logout?',
         async () => {
-            await window.userSystem.logout();
-            currentUser = null;
-            updateAuthUI();
-            await loadComments();
-            await loadUpdates();
-            showNotification('Logged out successfully!', 'success');
+            try {
+                // Gọi logout từ userSystem
+                const result = await window.userSystem.logout();
+                
+                if (result.success) {
+                    // Reset global variables
+                    currentUser = null;
+                    
+                    // Force UI update
+                    updateAuthUI();
+                    
+                    // Load data lại với trạng thái không đăng nhập
+                    await loadComments();
+                    await loadUpdates();
+                    
+                    // Hiển thị thông báo
+                    showNotification('Logged out successfully!', 'success');
+                    
+                    // Không reload page ngay lập tức
+                    // Thay vào đó chỉ reset state
+                    setTimeout(() => {
+                        // Refresh để clean cache nếu cần
+                        window.location.reload();
+                    }, 500);
+                } else {
+                    showNotification(result.error || 'Logout failed', 'error');
+                }
+            } catch (error) {
+                console.error('Logout error:', error);
+                
+                // Force logout cứng nếu API fail
+                window.userSystem.clearToken();
+                currentUser = null;
+                updateAuthUI();
+                await loadComments();
+                await loadUpdates();
+                
+                showNotification('Logged out', 'info');
+            }
         }
     );
 }
@@ -861,6 +948,8 @@ async function deleteUpdate(updateId) {
         }
     );
 }
+
+
 
 // ============ GAME FUNCTIONS (GIỮ NGUYÊN HOÀN TOÀN) ============
 function startGame() {

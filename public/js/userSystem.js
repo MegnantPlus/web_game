@@ -9,7 +9,12 @@ class UserSystem {
         this.currentUser = null;
         
         if (this.token) {
-            this.loadUserFromToken();
+            this.loadUserFromToken().then(() => {
+                console.log('✅ User loaded from token:', this.currentUser);
+            }).catch(() => {
+                console.log('❌ Failed to load user from token');
+                this.clearToken();
+            });
         }
     }
 
@@ -23,7 +28,9 @@ class UserSystem {
             headers: {
                 'Content-Type': 'application/json',
                 'Accept': 'application/json'
-            }
+            },
+            // Thêm credentials nếu cần
+            credentials: 'include'
         };
 
         // Add token if exists
@@ -37,24 +44,35 @@ class UserSystem {
 
         try {
             const response = await fetch(url, options);
-            const result = await response.json();
             
-            console.log(`📡 API Response ${endpoint}:`, result);
-            
+            // Kiểm tra response status trước
             if (!response.ok) {
-                // If unauthorized, clear token
+                // Nếu unauthorized, clear token
                 if (response.status === 401 || response.status === 403) {
                     this.clearToken();
                 }
-                throw new Error(result.error || `HTTP ${response.status}`);
+                
+                // Try to get error message from response
+                let errorMessage = `HTTP ${response.status}`;
+                try {
+                    const errorResult = await response.json();
+                    errorMessage = errorResult.error || errorResult.message || errorMessage;
+                } catch (e) {
+                    // Không parse được JSON
+                }
+                
+                throw new Error(errorMessage);
             }
+            
+            const result = await response.json();
+            console.log(`📡 API Response ${endpoint}:`, result);
             
             return result;
         } catch (error) {
             console.error(`❌ API Error ${endpoint}:`, error.message);
             
             // Show user-friendly error
-            if (error.message.includes('Failed to fetch')) {
+            if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
                 throw new Error('Cannot connect to server. Please check your connection.');
             }
             
@@ -71,17 +89,44 @@ class UserSystem {
                 password
             });
             
+            console.log('🔍 Register result:', result);
+            
             if (result.token) {
                 this.token = result.token;
                 localStorage.setItem('pickleball_token', result.token);
-                this.currentUser = result.user;
+                
+                // Lấy thông tin user từ result.user hoặc result trực tiếp
+                const userData = result.user || result;
+                
+                this.currentUser = {
+                    _id: userData._id || result._id,
+                    username: userData.username || result.username,
+                    email: userData.email || result.email,
+                    isAdmin: userData.isAdmin || result.isAdmin || false,
+                    createdAt: userData.createdAt || result.createdAt
+                };
+                
+                console.log('✅ Registration successful, user set:', this.currentUser);
+                
+                return {
+                    success: true,
+                    message: result.message || 'Registration successful!',
+                    user: this.currentUser,
+                    token: result.token
+                };
+            } else {
+                // Registration succeeded but no token (maybe email verification required)
+                return {
+                    success: true,
+                    message: result.message || 'Registration successful! Please login.',
+                    requiresLogin: true
+                };
             }
-            
-            return result;
         } catch (error) {
+            console.error('❌ Registration error:', error);
             return {
                 success: false,
-                error: error.message
+                error: error.message || 'Registration failed'
             };
         }
     }
@@ -93,34 +138,150 @@ class UserSystem {
                 password
             });
             
+            console.log('🔍 Login result:', result);
+            
             if (result.token) {
                 this.token = result.token;
                 localStorage.setItem('pickleball_token', result.token);
-                this.currentUser = result.user;
+                
+                // Lấy thông tin user từ result
+                const userData = result.user || result;
+                
+                this.currentUser = {
+                    _id: userData._id,
+                    username: userData.username,
+                    email: userData.email,
+                    isAdmin: userData.isAdmin || false
+                };
+                
+                console.log('✅ Login successful, user set:', this.currentUser);
+                
+                // Lưu thêm thông tin user vào localStorage để dễ truy cập
+                localStorage.setItem('pickleball_user', JSON.stringify(this.currentUser));
+                
+                return {
+                    success: true,
+                    message: result.message || 'Login successful!',
+                    user: this.currentUser,
+                    token: result.token
+                };
+            } else {
+                return {
+                    success: false,
+                    error: 'No token received from server'
+                };
             }
-            
-            return result;
         } catch (error) {
+            console.error('❌ Login error:', error);
             return {
                 success: false,
-                error: error.message
+                error: error.message || 'Login failed. Please check your credentials.'
             };
         }
     }
 
+    // ============ LOGOUT METHOD ============
     async logout() {
         try {
-            await this.apiCall('/auth/logout', 'POST');
-        } catch (error) {
-            console.log('Logout error (ignored):', error);
-        } finally {
+            // Gọi API logout nếu backend hỗ trợ
+            if (this.token) {
+                try {
+                    await this.apiCall('/auth/logout', 'POST');
+                } catch (error) {
+                    console.log('Logout API call failed, but clearing local session');
+                }
+            }
+            
+            // Clear everything
             this.clearToken();
+            
+            // Xóa tất cả session data
+            localStorage.removeItem('pickleball_user');
+            localStorage.removeItem('pickleball_token');
+            
+            // Force reload để clean state
+            setTimeout(() => {
+                // Chỉ reload nếu cần thiết
+                if (window.location.pathname === '/') {
+                    window.location.reload();
+                }
+            }, 100);
+            
+            return { success: true, message: 'Logged out successfully' };
+        } catch (error) {
+            console.error('Logout error:', error);
+            this.clearToken();
+            return { success: false, error: error.message };
         }
-        
-        return { success: true, message: "Logged out successfully!" };
     }
 
-    // ============ COMMENT METHODS ============
+    // ============ SESSION MANAGEMENT ============
+    async loadUserFromToken() {
+        try {
+            // Trước tiên kiểm tra nếu có user trong localStorage
+            const savedUser = localStorage.getItem('pickleball_user');
+            if (savedUser) {
+                this.currentUser = JSON.parse(savedUser);
+                console.log('✅ User loaded from localStorage:', this.currentUser);
+                return this.currentUser;
+            }
+            
+            // Nếu không, gọi API để lấy profile
+            if (!this.token) {
+                throw new Error('No token available');
+            }
+            
+            const result = await this.apiCall('/auth/profile', 'GET');
+            console.log('🔍 Profile result:', result);
+            
+            if (result && result.username) {
+                this.currentUser = {
+                    _id: result._id,
+                    username: result.username,
+                    email: result.email,
+                    isAdmin: result.isAdmin || false
+                };
+                
+                // Lưu vào localStorage
+                localStorage.setItem('pickleball_user', JSON.stringify(this.currentUser));
+                
+                console.log('✅ User loaded from API:', this.currentUser.username);
+                return this.currentUser;
+            }
+            
+            throw new Error('Invalid user data');
+        } catch (error) {
+            console.log('❌ Failed to load user from token:', error.message);
+            this.clearToken();
+            throw error;
+        }
+    }
+
+    clearToken() {
+        this.token = null;
+        this.currentUser = null;
+        localStorage.removeItem('pickleball_token');
+        localStorage.removeItem('pickleball_user');
+    }
+
+    isLoggedIn() {
+        // Kiểm tra cả token và user object
+        return !!(this.token && this.currentUser);
+    }
+
+    getUser() {
+        return this.currentUser;
+    }
+
+    getToken() {
+        return this.token;
+    }
+
+    isAdmin() {
+        return this.currentUser && this.currentUser.isAdmin;
+    }
+
+    // Các method còn lại giữ nguyên...
     async getComments() {
         try {
             const result = await this.apiCall('/comments', 'GET');
@@ -162,7 +323,6 @@ class UserSystem {
         }
     }
 
-    // ============ UPDATE METHODS ============
     async getUpdates() {
         try {
             const result = await this.apiCall('/updates', 'GET');
@@ -219,7 +379,6 @@ class UserSystem {
         }
     }
 
-    // ============ ADMIN METHODS ============
     async getUsers() {
         try {
             const result = await this.apiCall('/admin/users', 'GET');
@@ -278,42 +437,6 @@ class UserSystem {
                 error: error.message 
             };
         }
-    }
-
-    // ============ UTILITY METHODS ============
-    async loadUserFromToken() {
-        try {
-            const result = await this.apiCall('/auth/profile', 'GET');
-            if (result && result.username) {
-                this.currentUser = result;
-                console.log('✅ User loaded from token:', this.currentUser.username);
-            }
-        } catch (error) {
-            console.log('No valid token or failed to load user:', error);
-            this.clearToken();
-        }
-    }
-
-    clearToken() {
-        this.token = null;
-        this.currentUser = null;
-        localStorage.removeItem('pickleball_token');
-    }
-
-    isLoggedIn() {
-        return !!this.currentUser;
-    }
-
-    getUser() {
-        return this.currentUser;
-    }
-
-    getToken() {
-        return this.token;
-    }
-
-    isAdmin() {
-        return this.currentUser && this.currentUser.isAdmin;
     }
 
     canDeleteComment(commentAuthor) {
