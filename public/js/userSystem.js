@@ -1,4 +1,3 @@
-// userSystem.js - FIXED UNDEFINED ERROR
 class UserSystem {
     constructor() {
         this.API_BASE = 'https://backend-api-service-cyxi.onrender.com/api';
@@ -6,9 +5,14 @@ class UserSystem {
         this.token = localStorage.getItem('pickleball_token');
         this.currentUser = null;
         
-        // Load user if token exists
         if (this.token) {
-            this.loadUserFromToken().catch(error => {
+            this.loadUserFromToken().then(user => {
+                console.log('User loaded:', user);
+                // Force update UI after user loads
+                if (typeof updateAuthUI === 'function') {
+                    setTimeout(updateAuthUI, 100);
+                }
+            }).catch(error => {
                 console.log('Failed to load user:', error);
                 this.clearToken();
             });
@@ -27,7 +31,6 @@ class UserSystem {
             }
         };
 
-        // Add token if exists
         if (this.token) {
             options.headers['Authorization'] = `Bearer ${this.token}`;
         }
@@ -37,32 +40,23 @@ class UserSystem {
         }
 
         try {
-            console.log(`📡 API Call: ${method} ${url}`);
-            
             const response = await fetch(url, options);
             
             if (!response.ok) {
                 const errorText = await response.text();
-                console.error(`❌ API Error ${response.status}:`, errorText);
+                console.error(`API Error ${response.status}:`, errorText);
                 
                 if (response.status === 401 || response.status === 403) {
                     this.clearToken();
                 }
                 
-                throw new Error(`HTTP ${response.status}: ${errorText.substring(0, 100)}`);
+                throw new Error(`HTTP ${response.status}`);
             }
             
-            const result = await response.json();
-            console.log(`✅ API Success ${endpoint}:`, result);
-            return result;
+            return await response.json();
             
         } catch (error) {
-            console.error(`❌ API Error ${endpoint}:`, error.message);
-            
-            if (error.message.includes('Failed to fetch')) {
-                throw new Error('Cannot connect to server. Please check your connection.');
-            }
-            
+            console.error(`API Error ${endpoint}:`, error.message);
             throw error;
         }
     }
@@ -76,36 +70,35 @@ class UserSystem {
                 password
             });
             
-            console.log('Register API result:', result);
-            
-            // FIX: Check if result exists and has token
-            if (result && result.token) {
+            if (result.token) {
                 this.token = result.token;
                 localStorage.setItem('pickleball_token', this.token);
                 
-                // FIX: Safely get user data
+                // IMPORTANT: Get user data correctly
                 const userData = result.user || result;
                 
                 this.currentUser = {
-                    _id: userData._id || result._id,
-                    username: userData.username || result.username,
-                    email: userData.email || result.email,
-                    isAdmin: userData.isAdmin || result.isAdmin || false
+                    _id: userData._id,
+                    username: userData.username,
+                    email: userData.email,
+                    isAdmin: Boolean(userData.isAdmin), // Convert to boolean
+                    createdAt: userData.createdAt
                 };
                 
                 localStorage.setItem('pickleball_user', JSON.stringify(this.currentUser));
                 
+                console.log('✅ User registered (Admin?):', this.currentUser.isAdmin);
+                
                 return {
                     success: true,
-                    message: result.message || 'Registration successful',
+                    message: result.message,
                     user: this.currentUser,
                     token: result.token
                 };
             } else {
-                // Registration failed
                 return {
                     success: false,
-                    error: result?.error || 'Registration failed. No token received.'
+                    error: result.error
                 };
             }
         } catch (error) {
@@ -123,62 +116,41 @@ class UserSystem {
                 password
             });
             
-            console.log('Login API result:', result);
-            
-            // FIX: Check if result exists
-            if (!result) {
-                return {
-                    success: false,
-                    error: 'No response from server'
-                };
-            }
+            console.log('🔍 Login result:', result);
             
             if (result.token) {
                 this.token = result.token;
                 localStorage.setItem('pickleball_token', this.token);
                 
-                // FIX: Handle both response formats
-                let userData;
-                if (result.user) {
-                    userData = result.user;
-                } else if (result._id) {
-                    userData = result;
-                } else {
-                    return {
-                        success: false,
-                        error: 'Invalid user data from server'
-                    };
-                }
+                // IMPORTANT: Handle admin flag correctly
+                const userData = result.user || result;
                 
                 this.currentUser = {
                     _id: userData._id,
                     username: userData.username,
                     email: userData.email,
-                    isAdmin: userData.isAdmin || false
+                    isAdmin: Boolean(userData.isAdmin), // Convert to boolean
+                    createdAt: userData.createdAt
                 };
                 
                 localStorage.setItem('pickleball_user', JSON.stringify(this.currentUser));
                 
+                console.log('✅ User logged in (Admin?):', this.currentUser.isAdmin);
+                console.log('✅ User object:', this.currentUser);
+                
                 return {
                     success: true,
-                    message: result.message || 'Login successful',
+                    message: result.message,
                     user: this.currentUser,
                     token: result.token
-                };
-            } else if (result.error) {
-                // Login failed
-                return {
-                    success: false,
-                    error: result.error
                 };
             } else {
                 return {
                     success: false,
-                    error: 'Login failed. Unknown error.'
+                    error: result.error
                 };
             }
         } catch (error) {
-            console.error('Login error:', error);
             return {
                 success: false,
                 error: error.message
@@ -187,20 +159,8 @@ class UserSystem {
     }
 
     async logout() {
-        try {
-            // Clear local data
-            this.clearToken();
-            
-            return { 
-                success: true, 
-                message: 'Logged out successfully' 
-            };
-        } catch (error) {
-            return { 
-                success: false, 
-                error: error.message 
-            };
-        }
+        this.clearToken();
+        return { success: true, message: 'Logged out' };
     }
 
     // ============ SESSION MANAGEMENT ============
@@ -211,44 +171,38 @@ class UserSystem {
             if (savedUser) {
                 try {
                     this.currentUser = JSON.parse(savedUser);
-                    console.log('✅ User loaded from localStorage');
+                    console.log('✅ User from localStorage (Admin?):', this.currentUser.isAdmin);
                     return this.currentUser;
                 } catch (e) {
                     console.error('Failed to parse saved user:', e);
                 }
             }
             
-            if (!this.token) {
-                return null;
-            }
+            if (!this.token) return null;
             
             // Call API to get profile
             const result = await this.apiCall('/auth/profile', 'GET');
             
-            // FIX: Check if result exists
-            if (!result) {
-                throw new Error('No response from profile API');
-            }
-            
-            if (result._id && result.username) {
+            if (result && result._id) {
                 this.currentUser = {
                     _id: result._id,
                     username: result.username,
                     email: result.email,
-                    isAdmin: result.isAdmin || false
+                    isAdmin: Boolean(result.isAdmin), // Convert to boolean
+                    createdAt: result.createdAt
                 };
                 
                 localStorage.setItem('pickleball_user', JSON.stringify(this.currentUser));
                 
-                console.log('✅ User loaded from API:', this.currentUser.username);
+                console.log('✅ User from API (Admin?):', this.currentUser.isAdmin);
                 return this.currentUser;
-            } else {
-                throw new Error('Invalid user data from server');
             }
+            
+            return null;
         } catch (error) {
-            console.error('Failed to load user from token:', error.message);
+            console.error('Failed to load user:', error);
             this.clearToken();
-            throw error;
+            return null;
         }
     }
 
@@ -272,8 +226,17 @@ class UserSystem {
     }
 
     isAdmin() {
-        return this.currentUser && this.currentUser.isAdmin;
+        // IMPORTANT: Check if user exists and isAdmin is true
+        if (!this.currentUser) return false;
+        console.log('🔍 Checking admin status:', {
+            user: this.currentUser.username,
+            isAdmin: this.currentUser.isAdmin,
+            type: typeof this.currentUser.isAdmin
+        });
+        return Boolean(this.currentUser.isAdmin);
     }
+
+    // ... (rest of the methods remain the same) ...
 
     // ============ COMMENT METHODS ============
     async getComments() {
