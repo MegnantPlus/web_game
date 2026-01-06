@@ -1,3 +1,4 @@
+// userSystem.js - COMPLETE VERSION WITH NOTIFICATIONS
 class UserSystem {
     constructor() {
         this.API_BASE = 'https://backend-api-service-cyxi.onrender.com/api';
@@ -61,6 +62,31 @@ class UserSystem {
         }
     }
 
+    // ============ PROFILE & LOGOUT ============
+async getProfile() {
+    try {
+        const result = await this.apiCall('/auth/profile', 'GET');
+        return result;
+    } catch (error) {
+        return { 
+            success: false, 
+            error: error.message 
+        };
+    }
+}
+
+async updateProfile(updateData) {
+    try {
+        const result = await this.apiCall('/auth/profile', 'PUT', updateData);
+        return result;
+    } catch (error) {
+        return { 
+            success: false, 
+            error: error.message 
+        };
+    }
+}
+
     // ============ AUTH METHODS ============
     async register(username, email, password) {
         try {
@@ -74,14 +100,13 @@ class UserSystem {
                 this.token = result.token;
                 localStorage.setItem('pickleball_token', this.token);
                 
-                // IMPORTANT: Get user data correctly
                 const userData = result.user || result;
                 
                 this.currentUser = {
                     _id: userData._id,
                     username: userData.username,
                     email: userData.email,
-                    isAdmin: Boolean(userData.isAdmin), // Convert to boolean
+                    isAdmin: Boolean(userData.isAdmin),
                     createdAt: userData.createdAt
                 };
                 
@@ -122,14 +147,13 @@ class UserSystem {
                 this.token = result.token;
                 localStorage.setItem('pickleball_token', this.token);
                 
-                // IMPORTANT: Handle admin flag correctly
                 const userData = result.user || result;
                 
                 this.currentUser = {
                     _id: userData._id,
                     username: userData.username,
                     email: userData.email,
-                    isAdmin: Boolean(userData.isAdmin), // Convert to boolean
+                    isAdmin: Boolean(userData.isAdmin),
                     createdAt: userData.createdAt
                 };
                 
@@ -158,15 +182,23 @@ class UserSystem {
         }
     }
 
-    async logout() {
+async logout() {
+    try {
+        const result = await this.apiCall('/auth/logout', 'POST');
         this.clearToken();
-        return { success: true, message: 'Logged out' };
+        return result;
+    } catch (error) {
+        this.clearToken(); // Vẫn clear token dù API fail
+        return { 
+            success: true, 
+            message: 'Logged out locally'
+        };
     }
+}
 
     // ============ SESSION MANAGEMENT ============
     async loadUserFromToken() {
         try {
-            // Check localStorage first
             const savedUser = localStorage.getItem('pickleball_user');
             if (savedUser) {
                 try {
@@ -180,7 +212,6 @@ class UserSystem {
             
             if (!this.token) return null;
             
-            // Call API to get profile
             const result = await this.apiCall('/auth/profile', 'GET');
             
             if (result && result._id) {
@@ -188,7 +219,7 @@ class UserSystem {
                     _id: result._id,
                     username: result.username,
                     email: result.email,
-                    isAdmin: Boolean(result.isAdmin), // Convert to boolean
+                    isAdmin: Boolean(result.isAdmin),
                     createdAt: result.createdAt
                 };
                 
@@ -226,7 +257,6 @@ class UserSystem {
     }
 
     isAdmin() {
-        // IMPORTANT: Check if user exists and isAdmin is true
         if (!this.currentUser) return false;
         console.log('🔍 Checking admin status:', {
             user: this.currentUser.username,
@@ -236,14 +266,11 @@ class UserSystem {
         return Boolean(this.currentUser.isAdmin);
     }
 
-    // ... (rest of the methods remain the same) ...
-
     // ============ COMMENT METHODS ============
     async getComments() {
         try {
             const result = await this.apiCall('/comments', 'GET');
             
-            // FIX: Handle empty response
             if (!result) {
                 return {
                     success: false,
@@ -272,7 +299,6 @@ class UserSystem {
             
             const result = await this.apiCall('/comments', 'POST', data);
             
-            // FIX: Check result
             if (!result) {
                 return {
                     success: false,
@@ -293,7 +319,6 @@ class UserSystem {
         try {
             const result = await this.apiCall(`/comments/${commentId}`, 'DELETE');
             
-            // FIX: Check result
             if (!result) {
                 return {
                     success: false,
@@ -315,7 +340,6 @@ class UserSystem {
         try {
             const result = await this.apiCall('/updates', 'GET');
             
-            // FIX: Handle empty response
             if (!result) {
                 return {
                     success: false,
@@ -342,7 +366,6 @@ class UserSystem {
                 content 
             });
             
-            // FIX: Check result
             if (!result) {
                 return {
                     success: false,
@@ -366,7 +389,6 @@ class UserSystem {
                 content 
             });
             
-            // FIX: Check result
             if (!result) {
                 return {
                     success: false,
@@ -387,7 +409,6 @@ class UserSystem {
         try {
             const result = await this.apiCall(`/updates/${updateId}`, 'DELETE');
             
-            // FIX: Check result
             if (!result) {
                 return {
                     success: false,
@@ -404,12 +425,124 @@ class UserSystem {
         }
     }
 
+    // ============ NOTIFICATIONS API ============
+async getNotifications() {
+    try {
+        const result = await this.apiCall('/notifications', 'GET');
+        return result;
+    } catch (error) {
+        console.error('Failed to load notifications:', error);
+        return { 
+            success: false, 
+            error: error.message,
+            data: []
+        };
+    }
+}
+
+    async createNotification(content, parentNotificationId = null) {
+    try {
+        const data = { content };
+        if (parentNotificationId) {
+            data.parentNotificationId = parentNotificationId;
+        }
+        
+        const result = await this.apiCall('/notifications', 'POST', data);
+        return result;
+    } catch (error) {
+        return { 
+            success: false, 
+            error: error.message 
+        };
+    }
+}
+
+    async deleteNotification(notificationId) {
+    try {
+        const result = await this.apiCall(`/notifications/${notificationId}`, 'DELETE');
+        return result;
+    } catch (error) {
+        return { 
+            success: false, 
+            error: error.message 
+        };
+    }
+}
+
+// ============ COMMENT DETAILS ============
+async getCommentById(commentId) {
+    try {
+        const result = await this.apiCall(`/comments/${commentId}`, 'GET');
+        return result;
+    } catch (error) {
+        return { 
+            success: false, 
+            error: error.message 
+        };
+    }
+}
+
+
+async updateComment(commentId, content) {
+    try {
+        const result = await this.apiCall(`/comments/${commentId}`, 'PUT', { 
+            content 
+        });
+        return result;
+    } catch (error) {
+        return { 
+            success: false, 
+            error: error.message 
+        };
+    }
+}
+
+// ============ NOTIFICATION METHODS BỔ SUNG ============
+async getNotificationById(notificationId) {
+    try {
+        const result = await this.apiCall(`/notifications/${notificationId}`, 'GET');
+        return result;
+    } catch (error) {
+        return { 
+            success: false, 
+            error: error.message 
+        };
+    }
+}
+
+
+async updateNotification(notificationId, content) {
+    try {
+        const result = await this.apiCall(`/notifications/${notificationId}`, 'PUT', { 
+            content 
+        });
+        return result;
+    } catch (error) {
+        return { 
+            success: false, 
+            error: error.message 
+        };
+    }
+}
+
+// ============ ADMIN COMMENT DELETE ============
+async adminDeleteComment(commentId) {
+    try {
+        const result = await this.apiCall(`/admin/comments/${commentId}`, 'DELETE');
+        return result;
+    } catch (error) {
+        return { 
+            success: false, 
+            error: error.message 
+        };
+    }
+}
+
     // ============ ADMIN METHODS ============
     async getUsers() {
         try {
             const result = await this.apiCall('/admin/users', 'GET');
             
-            // FIX: Check result
             if (!result) {
                 return {
                     success: false,
@@ -430,7 +563,6 @@ class UserSystem {
         try {
             const result = await this.apiCall('/admin/stats', 'GET');
             
-            // FIX: Check result
             if (!result) {
                 return {
                     success: false,
@@ -447,53 +579,32 @@ class UserSystem {
         }
     }
 
-    async banUser(userId) {
-        try {
-            const result = await this.apiCall(`/admin/users/${userId}/ban`, 'PUT');
-            
-            // FIX: Check result
-            if (!result) {
-                return {
-                    success: false,
-                    error: 'No response from server'
-                };
-            }
-            
-            return result;
-        } catch (error) {
-            return { 
-                success: false, 
-                error: error.message 
+async banUser(userId) {
+    try {
+        // SỬA: PATCH thay vì PUT (theo tài liệu API)
+        const result = await this.apiCall(`/admin/users/${userId}/ban`, 'PATCH');
+        
+        if (!result) {
+            return {
+                success: false,
+                error: 'No response from server'
             };
         }
+        
+        return result;
+    } catch (error) {
+        return { 
+            success: false, 
+            error: error.message 
+        };
     }
+}
 
-    async promoteUser(userId) {
-        try {
-            const result = await this.apiCall(`/admin/users/${userId}/promote`, 'PUT');
-            
-            // FIX: Check result
-            if (!result) {
-                return {
-                    success: false,
-                    error: 'No response from server'
-                };
-            }
-            
-            return result;
-        } catch (error) {
-            return { 
-                success: false, 
-                error: error.message 
-            };
-        }
-    }
 
     async deleteUser(userId) {
         try {
             const result = await this.apiCall(`/admin/users/${userId}`, 'DELETE');
             
-            // FIX: Check result
             if (!result) {
                 return {
                     success: false,
@@ -514,6 +625,77 @@ class UserSystem {
         if (!this.currentUser) return false;
         return this.currentUser.username === commentAuthor || this.isAdmin();
     }
+
+    // ============ NOTIFICATIONS API ============
+async getNotifications() {
+    try {
+        const result = await this.apiCall('/notifications', 'GET');
+        return result;
+    } catch (error) {
+        console.error('Failed to load notifications:', error);
+        return { 
+            success: false, 
+            error: error.message,
+            data: []
+        };
+    }
+}
+
+async createNotification(content, parentNotificationId = null) {
+    try {
+        const data = { content };
+        if (parentNotificationId) {
+            data.parentNotificationId = parentNotificationId;
+        }
+        
+        const result = await this.apiCall('/notifications', 'POST', data);
+        return result;
+    } catch (error) {
+        return { 
+            success: false, 
+            error: error.message 
+        };
+    }
+}
+
+async deleteNotification(notificationId) {
+    try {
+        const result = await this.apiCall(`/notifications/${notificationId}`, 'DELETE');
+        return result;
+    } catch (error) {
+        return { 
+            success: false, 
+            error: error.message 
+        };
+    }
+}
+
+async getNotificationById(notificationId) {
+    try {
+        const result = await this.apiCall(`/notifications/${notificationId}`, 'GET');
+        return result;
+    } catch (error) {
+        return { 
+            success: false, 
+            error: error.message 
+        };
+    }
+}
+
+async updateNotification(notificationId, content) {
+    try {
+        const result = await this.apiCall(`/notifications/${notificationId}`, 'PUT', { 
+            content 
+        });
+        return result;
+    } catch (error) {
+        return { 
+            success: false, 
+            error: error.message 
+        };
+    }
+}
+
 }
 
 // Create global instance

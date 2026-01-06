@@ -508,29 +508,26 @@ class UserSystem {
         }
     }
 
-    async banUser(userId) {
-        try {
-            const result = await this.apiCall(`/admin/users/${userId}/ban`, 'PUT');
-            return result;
-        } catch (error) {
-            return { 
-                success: false, 
-                error: error.message 
+async banUser(userId) {
+    try {
+        // SỬA: PATCH thay vì PUT (theo tài liệu API)
+        const result = await this.apiCall(`/admin/users/${userId}/ban`, 'PATCH');
+        
+        if (!result) {
+            return {
+                success: false,
+                error: 'No response from server'
             };
         }
+        
+        return result;
+    } catch (error) {
+        return { 
+            success: false, 
+            error: error.message 
+        };
     }
-
-    async promoteUser(userId) {
-        try {
-            const result = await this.apiCall(`/admin/users/${userId}/promote`, 'PUT');
-            return result;
-        } catch (error) {
-            return { 
-                success: false, 
-                error: error.message 
-            };
-        }
-    }
+}
 
     async deleteUser(userId) {
         try {

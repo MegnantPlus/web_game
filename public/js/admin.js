@@ -58,7 +58,6 @@ async function loadAdminPanelData() {
     await updateAdminStats();
     await loadUsersList();
     await loadAdminCommentsList();
-    await loadAdminUpdatesList();
 }
 
 async function updateAdminStats() {
@@ -113,17 +112,6 @@ async function loadUsersList() {
                                     </button>` : 
                                     `<button class="ban-btn" onclick="banUser('${user._id}', '${user.username}')">
                                         <i class="fas fa-ban"></i> Ban
-                                    </button>`
-                                }
-                            ` : ''}
-                            
-                            ${!isCurrentUser ? `
-                                ${user.isAdmin ? 
-                                    `<button class="demote-btn" onclick="removeAdmin('${user._id}', '${user.username}')">
-                                        <i class="fas fa-user"></i> Remove Admin
-                                    </button>` : 
-                                    `<button class="promote-btn" onclick="makeAdmin('${user._id}', '${user.username}')">
-                                        <i class="fas fa-crown"></i> Make Admin
                                     </button>`
                                 }
                             ` : ''}
@@ -189,53 +177,6 @@ async function unbanUser(userId, username) {
                 }
             } catch (error) {
                 showNotification('Failed to unban user', 'error');
-            }
-        }
-    );
-}
-
-async function makeAdmin(userId, username) {
-    if (!window.userSystem.isAdmin()) {
-        showNotification('Admin only!', 'error');
-        return;
-    }
-    
-    showCustomConfirm(
-        'Make Admin',
-        `Are you sure you want to make <strong>${username}</strong> an admin?`,
-        async () => {
-            try {
-                const result = await window.userSystem.promoteUser(userId);
-                if (result.success) {
-                    showNotification(result.message || 'User promoted to admin', 'success');
-                    await loadUsersList();
-                } else {
-                    showNotification(result.error || 'Failed to promote user', 'error');
-                }
-            } catch (error) {
-                showNotification('Failed to promote user', 'error');
-            }
-        }
-    );
-}
-
-async function removeAdmin(userId, username) {
-    showCustomConfirm(
-        'Remove Admin',
-        `Are you sure you want to remove admin privileges from <strong>${username}</strong>?`,
-        async () => {
-            try {
-                // Note: You need to implement demoteUser in userSystem.js
-                // For now, we'll use the same endpoint or create a new one
-                const result = await window.userSystem.promoteUser(userId); // This should be demote
-                if (result && result.success) {
-                    showNotification('Admin privileges removed', 'success');
-                    await loadUsersList();
-                } else {
-                    showNotification('Failed to remove admin', 'error');
-                }
-            } catch (error) {
-                showNotification('Failed to remove admin', 'error');
             }
         }
     );
@@ -354,86 +295,6 @@ async function deleteCommentAdmin(commentId) {
     );
 }
 
-// ============ UPDATES MANAGEMENT ============
-async function loadAdminUpdatesList() {
-    const updatesList = document.getElementById('updatesList');
-    if (!updatesList) return;
-    
-    try {
-        const result = await window.userSystem.getUpdates();
-        if (result.success) {
-            const updates = result.data || [];
-            
-            updatesList.innerHTML = updates.map(update => {
-                return `
-                    <div class="update-item" data-update-id="${update._id}">
-                        <h4>${update.title}</h4>
-                        <div style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 5px; margin: 10px 0;">
-                            ${update.content.substring(0, 200)}${update.content.length > 200 ? '...' : ''}
-                        </div>
-                        <div class="update-meta">
-                            <small><i class="fas fa-user"></i> ${update.author}</small>
-                            <small><i class="far fa-calendar"></i> ${new Date(update.createdAt).toLocaleDateString()}</small>
-                        </div>
-                        <div class="update-actions">
-                            <button class="edit-update-btn" onclick="editUpdate('${update._id}')">
-                                <i class="fas fa-edit"></i> Edit
-                            </button>
-                            <button class="delete-update-btn" onclick="deleteUpdateAdmin('${update._id}')">
-                                <i class="fas fa-trash"></i> Delete
-                            </button>
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        } else {
-            updatesList.innerHTML = '<div class="error">Failed to load updates</div>';
-        }
-    } catch (error) {
-        console.error('Failed to load updates:', error);
-        updatesList.innerHTML = '<div class="error">Failed to load updates</div>';
-    }
-}
-
-async function deleteUpdateAdmin(updateId) {
-    showCustomConfirm(
-        'Delete Update',
-        'Are you sure you want to delete this update?',
-        async () => {
-            try {
-                const result = await window.userSystem.deleteUpdate(updateId);
-                if (result.success) {
-                    showNotification('Update deleted', 'success');
-                    await loadAdminUpdatesList();
-                    await updateAdminStats();
-                    // Reload main updates
-                    if (window.loadUpdates) {
-                        await window.loadUpdates();
-                    }
-                } else {
-                    showNotification(result.error || 'Failed to delete update', 'error');
-                }
-            } catch (error) {
-                showNotification('Failed to delete update', 'error');
-            }
-        }
-    );
-}
-
-async function editUpdate(updateId) {
-    try {
-        const result = await window.userSystem.getUpdates();
-        if (result.success) {
-            const update = result.data.find(u => u._id === updateId);
-            if (update) {
-                showEditUpdateForm(update._id, update.title, update.content);
-            }
-        }
-    } catch (error) {
-        showNotification('Failed to load update for editing', 'error');
-    }
-}
-
 // ============ TAB MANAGEMENT ============
 function openAdminTab(tabName) {
     // Hide all tabs
@@ -456,8 +317,8 @@ function openAdminTab(tabName) {
         loadUsersList();
     } else if (tabName === 'comments') {
         loadAdminCommentsList();
-    } else if (tabName === 'updates') {
-        loadAdminUpdatesList();
+    } else if (tabName === 'notifications') { // THÊM DÒNG NÀY
+        loadNotificationsList();
     }
 }
 
@@ -494,6 +355,150 @@ function searchComments() {
     });
 }
 
+// ============ NOTIFICATIONS MANAGEMENT ============
+async function loadNotificationsList() {
+    const notificationsList = document.getElementById('notificationsList');
+    if (!notificationsList) return;
+    
+    try {
+        const result = await window.userSystem.getNotifications();
+        if (result.success) {
+            const notifications = result.data || [];
+            
+            notificationsList.innerHTML = notifications.map(notification => {
+                return `
+                    <div class="notification-item" data-notification-id="${notification._id}">
+                        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
+                            <div>
+                                <strong>${notification.author?.username || 'System'}</strong>
+                                <small style="color: #888; margin-left: 10px;">
+                                    ${new Date(notification.createdAt).toLocaleString()}
+                                </small>
+                            </div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 5px; margin-bottom: 10px;">
+                            ${notification.content}
+                        </div>
+                        <button class="admin-delete-notification-btn" onclick="deleteNotificationAdmin('${notification._id}')">
+                            <i class="fas fa-trash"></i> Delete Notification
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        } else {
+            notificationsList.innerHTML = '<div class="error">Failed to load notifications</div>';
+        }
+    } catch (error) {
+        console.error('Failed to load notifications:', error);
+        notificationsList.innerHTML = '<div class="error">Failed to load notifications</div>';
+    }
+}
+
+async function loadNotifications() {
+    try {
+        const result = await window.userSystem.getNotifications();
+        if (result.success) {
+            window.notificationsData = result.data || [];
+            updateNotificationBadge();
+        } else {
+            window.notificationsData = [];
+        }
+    } catch (error) {
+        console.error('Failed to load notifications:', error);
+        window.notificationsData = [];
+    }
+}
+
+function updateNotificationBadge() {
+    if (!window.notificationsData || !window.notificationsData.length) return;
+    
+    // Tính số thông báo chưa đọc
+    const unreadCount = window.notificationsData.filter(n => !n.read).length;
+    
+    // Tạo hoặc cập nhật badge
+    let badge = document.getElementById('notificationBadge');
+    
+    if (unreadCount > 0) {
+        if (!badge) {
+            badge = document.createElement('span');
+            badge.id = 'notificationBadge';
+            badge.className = 'notification-badge';
+            badge.style.cssText = `
+                background: #ff4757;
+                color: white;
+                border-radius: 50%;
+                width: 20px;
+                height: 20px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 0.8rem;
+                font-weight: bold;
+                margin-left: 5px;
+            `;
+            
+            // Thêm vào username nếu có
+            const usernameDisplay = document.getElementById('usernameDisplay');
+            if (usernameDisplay) {
+                usernameDisplay.appendChild(badge);
+            }
+        }
+        badge.textContent = unreadCount;
+    } else if (badge) {
+        badge.remove();
+    }
+}
+
+// Gọi loadNotifications trong initializePage
+async function initializePage() {
+    console.log('🔄 Initializing page...');
+    
+    if (window.userSystem) {
+        if (window.userSystem.token && !window.userSystem.currentUser) {
+            try {
+                await window.userSystem.loadUserFromToken();
+            } catch (error) {
+                window.userSystem.clearToken();
+            }
+        }
+        
+        currentUser = window.userSystem.getUser();
+        console.log('✅ User loaded:', currentUser?.username || 'No user');
+    }
+    
+    updateAuthUI();
+    await loadComments();
+    await loadUpdates();
+    await loadNotifications(); // THÊM DÒNG NÀY
+    
+    setupSmoothScroll();
+    setupFullscreenListener();
+    setupOrientationListener();
+    
+    console.log('✅ Page initialized');
+}
+
+async function deleteNotificationAdmin(notificationId) {
+    showCustomConfirm(
+        'Delete Notification',
+        'Are you sure you want to delete this notification?',
+        async () => {
+            try {
+                const result = await window.userSystem.deleteNotification(notificationId);
+                if (result.success) {
+                    showNotification('Notification deleted', 'success');
+                    await loadNotificationsList();
+                } else {
+                    showNotification(result.error || 'Failed to delete notification', 'error');
+                }
+            } catch (error) {
+                showNotification('Failed to delete notification', 'error');
+            }
+        }
+    );
+}
+
+
 // ============ GLOBAL EXPORTS ============
 // Make functions available globally
 window.toggleAdminPanel = toggleAdminPanel;
@@ -503,9 +508,9 @@ window.searchUsers = searchUsers;
 window.searchComments = searchComments;
 window.banUser = banUser;
 window.unbanUser = unbanUser;
-window.makeAdmin = makeAdmin;
-window.removeAdmin = removeAdmin;
 window.deleteUser = deleteUser;
 window.deleteCommentAdmin = deleteCommentAdmin;
 window.editUpdate = editUpdate;
 window.deleteUpdateAdmin = deleteUpdateAdmin;
+window.loadNotificationsList = loadNotificationsList;
+window.deleteNotificationAdmin = deleteNotificationAdmin;

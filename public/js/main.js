@@ -6,6 +6,8 @@ let isShowingAllUpdates = false;
 let currentUpdateIndex = 0;
 let currentPreviewIndex = 0;
 let scrollPosition = 0;
+let notificationsData = [];
+
 
 // ============ INITIALIZATION ============
 async function initializePage() {
@@ -850,20 +852,6 @@ async function banUser(userId) {
             }
         }
     );
-}
-
-async function promoteUser(userId) {
-    try {
-        const result = await window.userSystem.promoteUser(userId);
-        if (result.success) {
-            showNotification(result.message || 'User promoted', 'success');
-            if (typeof loadAdminUsers === 'function') await loadAdminUsers();
-        } else {
-            showNotification(result.error || 'Failed to promote user', 'error');
-        }
-    } catch (error) {
-        showNotification('Failed to promote user', 'error');
-    }
 }
 
 async function deleteUser(userId) {
@@ -1890,7 +1878,6 @@ document.addEventListener('DOMContentLoaded', function() {
     window.submitEditUpdate = submitEditUpdate;
     window.deleteUpdate = deleteUpdate;
     window.banUser = banUser;
-    window.promoteUser = promoteUser;
     window.deleteUser = deleteUser;
     window.showAuthModal = showAuthModal;
     window.closeAuthModal = closeAuthModal;
@@ -1921,3 +1908,87 @@ setInterval(() => {
         updateAuthUI();
     }
 }, 2000);
+
+async function loadNotifications() {
+    try {
+        const result = await window.userSystem.getNotifications();
+        if (result.success) {
+            notificationsData = result.data || [];
+            updateNotificationBadge();
+        } else {
+            notificationsData = [];
+        }
+    } catch (error) {
+        console.error('Failed to load notifications:', error);
+        notificationsData = [];
+    }
+}
+
+function updateNotificationBadge() {
+    if (!notificationsData || !notificationsData.length) return;
+    
+    // Tính số thông báo chưa đọc
+    const unreadCount = notificationsData.filter(n => !n.read).length;
+    
+    // Tạo hoặc cập nhật badge
+    let badge = document.getElementById('notificationBadge');
+    
+    if (unreadCount > 0) {
+        if (!badge) {
+            badge = document.createElement('span');
+            badge.id = 'notificationBadge';
+            badge.className = 'notification-badge';
+            badge.style.cssText = `
+                background: #ff4757;
+                color: white;
+                border-radius: 50%;
+                width: 20px;
+                height: 20px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 0.8rem;
+                font-weight: bold;
+                margin-left: 5px;
+            `;
+            
+            // Thêm vào username nếu có
+            const usernameDisplay = document.getElementById('usernameDisplay');
+            if (usernameDisplay) {
+                usernameDisplay.appendChild(badge);
+            }
+        }
+        badge.textContent = unreadCount;
+    } else if (badge) {
+        badge.remove();
+    }
+}
+
+// Thêm vào hàm initializePage
+async function initializePage() {
+    console.log('🔄 Initializing page...');
+    
+    if (window.userSystem) {
+        if (window.userSystem.token && !window.userSystem.currentUser) {
+            try {
+                await window.userSystem.loadUserFromToken();
+            } catch (error) {
+                window.userSystem.clearToken();
+            }
+        }
+        
+        currentUser = window.userSystem.getUser();
+        console.log('✅ User loaded:', currentUser?.username || 'No user');
+    }
+    
+    updateAuthUI();
+    await loadComments();
+    await loadUpdates();
+    await loadNotifications(); // THÊM DÒNG NÀY
+    
+    setupSmoothScroll();
+    setupFullscreenListener();
+    setupOrientationListener();
+    
+    console.log('✅ Page initialized');
+}

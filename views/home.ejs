@@ -242,17 +242,31 @@
                 </div>
 
                 <!-- Tabs -->
-                <div class="admin-tabs">
-                    <button class="admin-tab active" onclick="openAdminTab('users')">
-                        <i class="fas fa-users"></i> Users
-                    </button>
-                    <button class="admin-tab" onclick="openAdminTab('comments')">
-                        <i class="fas fa-comments"></i> Comments
-                    </button>
-                    <button class="admin-tab" onclick="openAdminTab('updates')">
-                        <i class="fas fa-bullhorn"></i> Updates
-                    </button>
-                </div>
+                            <!-- Trong phần admin-tabs -->
+<div class="admin-tabs">
+    <button class="admin-tab active" onclick="openAdminTab('users')">
+        <i class="fas fa-users"></i> Users
+    </button>
+    <button class="admin-tab" onclick="openAdminTab('comments')">
+        <i class="fas fa-comments"></i> Comments
+    </button>
+    <!-- THÊM NOTIFICATIONS TAB -->
+    <button class="admin-tab" onclick="openAdminTab('notifications')">
+        <i class="fas fa-bell"></i> Notifications
+    </button>
+</div>
+
+            <!-- Thêm notifications tab content (sau updatesTab) -->
+<div id="notificationsTab" class="admin-tab-content">
+    <div class="notification-controls" style="margin-bottom: 20px;">
+        <button class="add-notification-btn" onclick="showNotificationForm()">
+            <i class="fas fa-plus"></i> Add Notification
+        </button>
+    </div>
+    <div class="notifications-list" id="notificationsList">
+        <!-- Notifications will be loaded here -->
+    </div>
+</div>
 
                 <!-- Users Tab -->
                 <div id="usersTab" class="admin-tab-content active">
@@ -273,16 +287,6 @@
                     </div>
                     <div class="admin-comments-list" id="adminCommentsList">
                         <!-- Comments will be loaded here -->
-                    </div>
-                </div>
-
-                <!-- Updates Tab -->
-                <div id="updatesTab" class="admin-tab-content">
-                    <button class="add-update-btn" onclick="showAddUpdateForm()">
-                        <i class="fas fa-plus"></i> Add New Update
-                    </button>
-                    <div class="updates-list" id="updatesList">
-                        <!-- Updates will be loaded here -->
                     </div>
                 </div>
             </div>

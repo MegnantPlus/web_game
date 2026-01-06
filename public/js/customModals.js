@@ -95,6 +95,89 @@ function closeUpdateForm() {
     }
 }
 
+// ===== NOTIFICATION FORM MODAL =====
+function showNotificationForm() {
+    const modal = document.createElement('div');
+    modal.className = 'custom-modal-overlay';
+    modal.id = 'notificationFormModal';
+    
+    modal.innerHTML = `
+        <div class="custom-modal">
+            <div class="modal-header">
+                <h2><i class="fas fa-bell"></i> Add Notification</h2>
+                <button class="modal-close-btn" onclick="closeCustomModal('notificationFormModal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="notificationContent">
+                        <i class="fas fa-align-left"></i> Notification Content
+                    </label>
+                    <textarea id="notificationContent" 
+                              class="form-textarea" 
+                              placeholder="Enter notification content..."
+                              rows="4"></textarea>
+                    <div class="char-count">
+                        <span id="notificationCharCount">0</span>/500 characters
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <button class="cancel-btn" onclick="closeCustomModal('notificationFormModal')">
+                    <i class="fas fa-times"></i> Cancel
+                </button>
+                <button class="submit-btn" onclick="submitNotification()">
+                    <i class="fas fa-check"></i> Send Notification
+                </button>
+            </div>
+        </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    // Character counter
+    const contentInput = document.getElementById('notificationContent');
+    const contentCounter = document.getElementById('notificationCharCount');
+    
+    contentInput.addEventListener('input', () => {
+        contentCounter.textContent = contentInput.value.length;
+    });
+    
+    setTimeout(() => contentInput.focus(), 100);
+}
+
+async function submitNotification() {
+    const content = document.getElementById('notificationContent').value.trim();
+    
+    if (!content) {
+        showNotification('Please enter notification content', 'error');
+        return;
+    }
+    
+    if (!window.userSystem.isAdmin()) {
+        showNotification('Admin access required', 'error');
+        return;
+    }
+    
+    try {
+        const result = await window.userSystem.createNotification(content);
+        if (result.success) {
+            closeCustomModal('notificationFormModal');
+            if (typeof loadNotificationsList === 'function') {
+                await loadNotificationsList();
+            }
+            showNotification('Notification sent!', 'success');
+        } else {
+            showNotification(result.error || 'Failed to send notification', 'error');
+        }
+    } catch (error) {
+        showNotification('Failed to send notification', 'error');
+    }
+}
+
 // ============ UPDATES ============
 async function loadUpdates() {
     try {
@@ -499,3 +582,6 @@ function confirmUnbanUser(username) {
         }
     );
 }
+
+window.showNotificationForm = showNotificationForm;
+window.submitNotification = submitNotification;
