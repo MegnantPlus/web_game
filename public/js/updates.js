@@ -236,16 +236,5 @@ function renderUpdatePreviews() {
             </div>
         </div>
         
-        ${allItems.length > 1 ? `
-            <div class="preview-navigation">
-                <button class="preview-nav-btn" onclick="prevPreviewUpdate()">
-                    <i class="fas fa-chevron-left"></i> Previous
-                </button>
-                <span class="preview-counter">${currentPreviewIndex + 1}/${allItems.length}</span>
-                <button class="preview-nav-btn" onclick="nextPreviewUpdate()">
-                    Next <i class="fas fa-chevron-right"></i>
-                </button>
-            </div>
-        ` : ''}
     `;
 }
