@@ -129,10 +129,6 @@
             min-width: 200px;
             justify-content: center;
         }
-        .donate-btn:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
-        }
         .donate-btn.paypal {
             background: #FFD700;
             color: black;
@@ -405,7 +401,7 @@
     <div class="updates-section" id="updatesSection">
         <div class="updates-container">
             <div class="updates-header">
-                <h2><i class="fas fa-bullhorn"></i> Updates <span class="updates-count" id="updatesCount">(0)</span></h2>
+                <h2><i class="fas fa-bullhorn"></i> Notifications <span class="updates-count" id="updatesCount">(0)</span></h2>
                 
                 <!-- Search and Filter -->
                 <div class="updates-controls">
@@ -419,14 +415,9 @@
             <!-- Update Slider (for logged in users) -->
             <div id="updatesSlider" class="updates-slider" style="display: none;">
                 <div class="slider-header">
-                    <h3>Updates <span id="updateCounter">1/5</span></h3>
+                    <h3>Notifications <span id="updateCounter">1/5</span></h3>
                     <div class="slider-controls">
-                        <button id="prevUpdate" class="slider-btn" onclick="prevUpdate()">
-                            <i class="fas fa-chevron-left"></i>
-                        </button>
-                        <button id="nextUpdate" class="slider-btn" onclick="nextUpdate()">
-                            <i class="fas fa-chevron-right"></i>
-                        </button>
+                     
                         <button id="showAllUpdates" class="show-all-btn" onclick="toggleShowAll()">
                             <i class="fas fa-list"></i> Show All
                         </button>
@@ -503,6 +494,6 @@
     <script src="js/admin.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="js/payment.js"></script>
-    
+
 </body>
 </html>

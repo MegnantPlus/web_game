@@ -1,10 +1,10 @@
-// payment.js - Payment System with QR Code and Polling
+// payment.js - SIMPLIFIED AND WORKING VERSION
 class PaymentSystem {
     constructor() {
         this.pollingInterval = null;
         this.currentOrderCode = null;
         this.pollingAttempts = 0;
-        this.maxPollingAttempts = 180; // 6 minutes (180 * 2 seconds)
+        this.maxPollingAttempts = 60; // 2 minutes (60 * 2 seconds)
     }
     
     // Generate QR Code using qrcode.js library
@@ -54,7 +54,6 @@ class PaymentSystem {
         // Get user info if logged in
         const currentUser = window.userSystem ? window.userSystem.getUser() : null;
         const userName = currentUser ? currentUser.username : '';
-        const userEmail = currentUser ? (currentUser.email || '') : '';
         
         modalOverlay.innerHTML = `
             <div class="donate-modal-compact">
@@ -166,38 +165,38 @@ class PaymentSystem {
                             <i class="fas fa-qrcode"></i> Quét mã QR để thanh toán
                         </h4>
                         
-                        <div id="qrCodeImage"></div>
+                        <div id="qrCodeImage" style="margin: 20px 0;"></div>
                         
-                        <div class="qr-info">
-                            <div>
+                        <div class="qr-info" style="background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
                                 <span>Số tiền:</span>
-                                <strong id="qrAmount">0 đ</strong>
+                                <strong id="qrAmount" style="color: #4CAF50;">0 đ</strong>
                             </div>
-                            <div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
                                 <span>Mã đơn hàng:</span>
-                                <strong id="qrOrderCode">-</strong>
+                                <strong id="qrOrderCode" style="font-family: monospace;">-</strong>
                             </div>
-                            <div>
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
                                 <span>Trạng thái:</span>
-                                <strong id="qrStatus">Đang chờ...</strong>
+                                <strong id="qrStatus" style="color: #FFC107;">Đang chờ...</strong>
                             </div>
                         </div>
                         
-                        <div id="pollingStatus" class="polling-status pending">
-                            <div class="polling-loader"></div>
-                            <span>Đang kiểm tra thanh toán...</span>
+                        <div id="pollingStatus" style="text-align: center; padding: 15px; border-radius: 8px; background: rgba(255, 193, 7, 0.1); border: 1px solid rgba(255, 193, 7, 0.3); margin-bottom: 15px;">
+                            <div class="polling-loader" style="display: inline-block; width: 20px; height: 20px; border: 2px solid rgba(255, 255, 255, 0.3); border-top-color: #2196F3; border-radius: 50%; animation: spin 1s linear infinite; margin-right: 10px;"></div>
+                            <span id="pollingText">Đang kiểm tra thanh toán...</span>
                         </div>
                         
-                        <div id="paymentResult" class="payment-result" style="display: none;">
+                        <div id="paymentResult" style="display: none; text-align: center; padding: 20px; background: rgba(76, 175, 80, 0.1); border: 1px solid rgba(76, 175, 80, 0.3); border-radius: 8px;">
                             <div class="payment-success">
-                                <i class="fas fa-check-circle"></i>
-                                <h3>THANH TOÁN THÀNH CÔNG!</h3>
-                                <p>Cảm ơn bạn đã ủng hộ!</p>
+                                <i class="fas fa-check-circle" style="font-size: 4rem; color: #4CAF50; margin-bottom: 15px;"></i>
+                                <h3 style="color: #4CAF50; margin-bottom: 10px;">THANH TOÁN THÀNH CÔNG!</h3>
+                                <p style="color: #ddd; margin-bottom: 20px;">Cảm ơn bạn đã ủng hộ!</p>
                             </div>
                             <button onclick="window.paymentSystem.closeModal()" 
                                     style="background: #2196F3; color: white; border: none; 
                                            padding: 12px 24px; border-radius: 8px; 
-                                           cursor: pointer; margin-top: 15px;">
+                                           cursor: pointer; font-weight: bold;">
                                 Đóng
                             </button>
                         </div>
@@ -233,9 +232,7 @@ class PaymentSystem {
         const buttons = document.querySelectorAll('.amount-btn');
         buttons.forEach(btn => {
             btn.addEventListener('click', () => {
-                // Remove active class from all buttons
                 buttons.forEach(b => b.classList.remove('active'));
-                // Add active class to clicked button
                 btn.classList.add('active');
             });
         });
@@ -246,7 +243,6 @@ class PaymentSystem {
         if (input) {
             input.value = amount;
             
-            // Highlight the button
             const buttons = document.querySelectorAll('.amount-btn');
             buttons.forEach(btn => {
                 btn.classList.remove('active');
@@ -303,11 +299,14 @@ class PaymentSystem {
         
         try {
             // Call API to create payment
+            console.log('💰 Creating payment for amount:', amount);
             const result = await window.userSystem.createPayment(amount, message || 'Ủng hộ website');
+            
+            console.log('💰 Payment creation result:', result);
             
             if (result.success && result.checkoutUrl && result.qrCode) {
                 // Store order code
-                const orderCode = result.orderCode || this.extractOrderCode(result.checkoutUrl);
+                const orderCode = result.orderCode || result.checkoutUrl.split('/').pop() || 'ORDER_' + Date.now().toString().slice(-8);
                 this.currentOrderCode = orderCode;
                 
                 // Show QR container
@@ -317,19 +316,30 @@ class PaymentSystem {
                 // Update info
                 document.getElementById('qrAmount').textContent = amount.toLocaleString('vi-VN') + 'đ';
                 document.getElementById('qrOrderCode').textContent = orderCode;
+                document.getElementById('qrStatus').textContent = 'ĐANG CHỜ THANH TOÁN';
+                document.getElementById('qrStatus').style.color = '#FFC107';
+                
+                // Hide payment result if visible
+                document.getElementById('paymentResult').style.display = 'none';
+                
+                // Show polling status
+                document.getElementById('pollingStatus').style.display = 'block';
+                document.getElementById('pollingText').textContent = 'Đang kiểm tra thanh toán...';
                 
                 // Generate QR code
                 this.generateQRCode('qrCodeImage', result.qrCode);
                 
-                // Start polling
-                this.startPolling(orderCode);
+                // Start SIMPLE polling
+                this.startSimplePolling(orderCode);
+                
+                this.showNotification('✅ Đã tạo mã QR thành công!', 'success');
                 
             } else {
-                this.showNotification(result.error || 'Không thể tạo mã QR. Vui lòng thử lại!', 'error');
+                this.showNotification(result.error || 'Không thể tạo mã QR', 'error');
             }
         } catch (error) {
-            this.showNotification('Lỗi kết nối. Vui lòng thử lại!', 'error');
-            console.error('Payment error:', error);
+            console.error('Payment creation error:', error);
+            this.showNotification('Lỗi kết nối: ' + error.message, 'error');
         } finally {
             // Reset form state
             document.getElementById('donateForm').style.opacity = '';
@@ -337,98 +347,132 @@ class PaymentSystem {
         }
     }
     
-    extractOrderCode(checkoutUrl) {
-        // Extract order code from checkout URL
-        const match = checkoutUrl.match(/payment-link\/(\w+)/);
-        return match ? match[1] : 'ORDER_' + Date.now().toString().slice(-8);
-    }
-    
-    startPolling(orderCode) {
+    // SIMPLE POLLING - chỉ kiểm tra đơn giản
+    startSimplePolling(orderCode) {
+        console.log(`🔍 Bắt đầu polling đơn giản cho: ${orderCode}`);
+        
         // Clear any existing polling
         this.stopPolling();
         
+        // Reset attempts
         this.pollingAttempts = 0;
         
+        // Start polling
         this.pollingInterval = setInterval(async () => {
             this.pollingAttempts++;
             
             if (this.pollingAttempts > this.maxPollingAttempts) {
+                console.log('⏰ Timeout polling');
                 this.stopPolling();
-                this.showPollingStatus('Hết thời gian chờ thanh toán. Vui lòng thử lại!', 'error');
+                document.getElementById('pollingText').textContent = 'Hết thời gian chờ';
+                document.getElementById('pollingStatus').style.background = 'rgba(255, 71, 87, 0.1)';
+                document.getElementById('pollingStatus').style.borderColor = 'rgba(255, 71, 87, 0.3)';
                 return;
             }
             
             try {
-                const result = await window.userSystem.checkPaymentStatus(orderCode);
+                console.log(`🔄 Kiểm tra lần ${this.pollingAttempts} cho order: ${orderCode}`);
                 
-                if (result.success && result.data) {
-                    const status = result.data.status;
+                // Gọi API kiểm tra trạng thái
+                const result = await window.userSystem.checkPaymentStatus(orderCode);
+                console.log('📡 Kết quả kiểm tra:', result);
+                
+                if (result.success) {
+                    // XỬ LÝ KẾT QUẢ TỪ BACKEND THẬT
+                    const paymentData = result.data || result;
+                    const status = paymentData.status || paymentData.paymentStatus;
                     
-                    if (status === 'PAID') {
-                        // Payment successful!
-                        this.stopPolling();
-                        this.showPaymentSuccess();
-                        
-                        // Save donation to history
-                        this.saveDonationHistory(result.data);
-                        
-                    } else if (status === 'CANCELLED' || status === 'EXPIRED') {
-                        this.stopPolling();
-                        this.showPollingStatus('Đơn hàng đã hết hạn hoặc bị hủy!', 'error');
-                    } else {
-                        // Still pending
-                        const remainingTime = Math.floor((this.maxPollingAttempts - this.pollingAttempts) * 2 / 60);
-                        this.showPollingStatus(`Đang chờ thanh toán... (còn khoảng ${remainingTime} phút)`);
+                    console.log('💰 Trạng thái thanh toán:', status);
+                    
+                    // Cập nhật trạng thái hiển thị
+                    this.updateStatusDisplay(status);
+                    
+                    // Nếu thanh toán thành công
+                    if (status === 'PAID' || status === 'SUCCESS' || status === 'paid' || status === 'success') {
+                        console.log('✅ PHÁT HIỆN THANH TOÁN THÀNH CÔNG!');
+                        this.handlePaymentSuccess(paymentData);
+                        return;
                     }
+                    
+                    // Nếu thất bại
+                    if (status === 'CANCELLED' || status === 'EXPIRED' || status === 'FAILED') {
+                        console.log('❌ Thanh toán thất bại');
+                        this.stopPolling();
+                        document.getElementById('pollingText').textContent = 'Thanh toán thất bại';
+                        document.getElementById('qrStatus').textContent = 'THẤT BẠI';
+                        document.getElementById('qrStatus').style.color = '#ff4757';
+                        return;
+                    }
+                    
+                    // Vẫn đang chờ
+                    const remainingMinutes = Math.floor((this.maxPollingAttempts - this.pollingAttempts) * 2 / 60);
+                    document.getElementById('pollingText').textContent = `Đang chờ... (còn ~${remainingMinutes} phút)`;
+                    
+                } else {
+                    console.log('⚠️ Kiểm tra không thành công:', result.error);
+                    document.getElementById('pollingText').textContent = `Đang thử lại... (${this.pollingAttempts}/${this.maxPollingAttempts})`;
                 }
+                
             } catch (error) {
-                console.error('Polling error:', error);
+                console.error('❌ Lỗi khi kiểm tra:', error);
+                document.getElementById('pollingText').textContent = `Lỗi kết nối, thử lại...`;
             }
-        }, 2000); // Check every 2 seconds
+        }, 2000); // Kiểm tra mỗi 2 giây
+    }
+    
+    updateStatusDisplay(status) {
+        const qrStatus = document.getElementById('qrStatus');
+        if (!qrStatus) return;
+        
+        const statusMap = {
+            'PAID': { text: 'ĐÃ THANH TOÁN', color: '#4CAF50' },
+            'SUCCESS': { text: 'THÀNH CÔNG', color: '#4CAF50' },
+            'paid': { text: 'ĐÃ THANH TOÁN', color: '#4CAF50' },
+            'success': { text: 'THÀNH CÔNG', color: '#4CAF50' },
+            'PENDING': { text: 'ĐANG CHỜ', color: '#FFC107' },
+            'pending': { text: 'ĐANG CHỜ', color: '#FFC107' },
+            'CANCELLED': { text: 'ĐÃ HỦY', color: '#ff4757' },
+            'EXPIRED': { text: 'HẾT HẠN', color: '#ff4757' },
+            'FAILED': { text: 'THẤT BẠI', color: '#ff4757' }
+        };
+        
+        const display = statusMap[status] || { text: 'ĐANG XỬ LÝ', color: '#aaa' };
+        qrStatus.textContent = display.text;
+        qrStatus.style.color = display.color;
+    }
+    
+    handlePaymentSuccess(paymentData) {
+        console.log('🎉 Xử lý thanh toán thành công');
+        
+        // Dừng polling
+        this.stopPolling();
+        
+        // Ẩn polling status
+        document.getElementById('pollingStatus').style.display = 'none';
+        
+        // Hiển thị kết quả thành công
+        document.getElementById('paymentResult').style.display = 'block';
+        
+        // Cập nhật trạng thái QR
+        document.getElementById('qrStatus').textContent = 'THÀNH CÔNG';
+        document.getElementById('qrStatus').style.color = '#4CAF50';
+        document.getElementById('qrStatus').style.fontWeight = 'bold';
+        
+        // Lưu vào lịch sử
+        this.saveDonationHistory(paymentData);
+        
+        // Hiệu ứng confetti
+        this.showConfetti();
+        
+        // Thông báo
+        this.showNotification('🎉 Thanh toán thành công! Cảm ơn bạn!', 'success');
     }
     
     stopPolling() {
         if (this.pollingInterval) {
             clearInterval(this.pollingInterval);
             this.pollingInterval = null;
-        }
-    }
-    
-    showPollingStatus(message, type = 'pending') {
-        const statusElement = document.getElementById('pollingStatus');
-        const statusText = document.getElementById('qrStatus');
-        
-        if (statusElement && statusText) {
-            statusElement.className = `polling-status ${type}`;
-            statusElement.innerHTML = type === 'pending' 
-                ? `<div class="polling-loader"></div><span>${message}</span>`
-                : `<i class="fas fa-exclamation-circle"></i><span>${message}</span>`;
-            
-            statusText.textContent = message;
-            statusText.style.color = type === 'pending' ? '#FFC107' : 
-                                   type === 'success' ? '#4CAF50' : '#f44336';
-        }
-    }
-    
-    showPaymentSuccess() {
-        const qrContainer = document.getElementById('qrContainer');
-        const pollingStatus = document.getElementById('pollingStatus');
-        const paymentResult = document.getElementById('paymentResult');
-        
-        if (qrContainer && pollingStatus && paymentResult) {
-            // Update status
-            document.getElementById('qrStatus').textContent = 'Đã thanh toán';
-            document.getElementById('qrStatus').style.color = '#4CAF50';
-            
-            // Hide polling status, show success
-            pollingStatus.style.display = 'none';
-            paymentResult.style.display = 'block';
-            
-            // Add confetti effect
-            this.showConfetti();
-            
-            // Play success sound if available
-            this.playSuccessSound();
+            console.log('🛑 Đã dừng polling');
         }
     }
     
@@ -461,17 +505,6 @@ class PaymentSystem {
                 animation: fall ${Math.random() * 3 + 2}s linear forwards;
             `;
             
-            // Add animation
-            const style = document.createElement('style');
-            style.textContent = `
-                @keyframes fall {
-                    to {
-                        transform: translateY(100vh) rotate(${Math.random() * 360}deg);
-                        opacity: 0;
-                    }
-                }
-            `;
-            confettiContainer.appendChild(style);
             confettiContainer.appendChild(confetti);
             
             // Remove after animation
@@ -484,29 +517,6 @@ class PaymentSystem {
         setTimeout(() => {
             if (confettiContainer.parentElement) confettiContainer.remove();
         }, 5000);
-    }
-    
-    playSuccessSound() {
-        // Simple success sound using Web Audio API
-        try {
-            const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
-            
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
-            
-            oscillator.frequency.value = 523.25; // C5
-            oscillator.type = 'sine';
-            
-            gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.5);
-            
-            oscillator.start(audioContext.currentTime);
-            oscillator.stop(audioContext.currentTime + 0.5);
-        } catch (e) {
-            console.log('Audio not supported:', e);
-        }
     }
     
     saveDonationHistory(paymentData) {
@@ -525,9 +535,9 @@ class PaymentSystem {
             donations.push(donation);
             localStorage.setItem('pickleball_donations', JSON.stringify(donations));
             
-            console.log('Donation saved:', donation);
+            console.log('💾 Đã lưu vào lịch sử:', donation);
         } catch (error) {
-            console.error('Failed to save donation:', error);
+            console.error('❌ Lỗi khi lưu lịch sử:', error);
         }
     }
     
@@ -548,11 +558,9 @@ class PaymentSystem {
     }
     
     showNotification(message, type = 'info') {
-        // Reuse existing notification function or create simple one
         if (typeof showNotification === 'function') {
             showNotification(message, type);
         } else {
-            // Simple notification
             const notification = document.createElement('div');
             notification.style.cssText = `
                 position: fixed;
@@ -565,10 +573,14 @@ class PaymentSystem {
                 z-index: 10001;
                 animation: slideIn 0.3s ease;
                 max-width: 300px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+                display: flex;
+                align-items: center;
+                gap: 10px;
             `;
             notification.innerHTML = `
                 <i class="fas fa-${type === 'error' ? 'exclamation-circle' : 'check-circle'}"></i>
-                <span style="margin-left: 10px;">${message}</span>
+                <span>${message}</span>
             `;
             
             document.body.appendChild(notification);
@@ -582,3 +594,34 @@ class PaymentSystem {
 
 // Create global instance
 window.paymentSystem = new PaymentSystem();
+
+// Add CSS animations
+if (!document.querySelector('#payment-animations')) {
+    const style = document.createElement('style');
+    style.id = 'payment-animations';
+    style.textContent = `
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        @keyframes fadeOut {
+            from { opacity: 1; transform: translateY(0); }
+            to { opacity: 0; transform: translateY(-20px); }
+        }
+        
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(30px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        
+        @keyframes fall {
+            to { transform: translateY(100vh) rotate(360deg); opacity: 0; }
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    `;
+    document.head.appendChild(style);
+}

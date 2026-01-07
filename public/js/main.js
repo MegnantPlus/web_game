@@ -7,37 +7,31 @@ let currentUpdateIndex = 0;
 let currentPreviewIndex = 0;
 let scrollPosition = 0;
 let notificationsData = [];
-
+window.notificationsData = [];
+let isShowingAllNotifications = false;
+let currentNotificationIndex = 0;
 
 // ============ INITIALIZATION ============
 async function initializePage() {
     console.log('🔄 Initializing page...');
     
-    // Đợi userSystem khởi tạo xong
     if (window.userSystem) {
-        // Kiểm tra nếu có token nhưng chưa load user
         if (window.userSystem.token && !window.userSystem.currentUser) {
             try {
                 await window.userSystem.loadUserFromToken();
             } catch (error) {
-                console.log('Failed to load user from token, clearing session');
                 window.userSystem.clearToken();
             }
         }
         
-        // Lấy user từ userSystem
         currentUser = window.userSystem.getUser();
         console.log('✅ User loaded:', currentUser?.username || 'No user');
     }
     
-    // Update UI
     updateAuthUI();
-    
-    // Load data từ API
     await loadComments();
-    await loadUpdates();
+    await loadNotifications(); // THÊM DÒNG NÀY
     
-    // Setup event listeners
     setupSmoothScroll();
     setupFullscreenListener();
     setupOrientationListener();
@@ -1727,32 +1721,304 @@ setInterval(() => {
 async function loadNotifications() {
     try {
         const result = await window.userSystem.getNotifications();
-        if (result.success) {
-            notificationsData = result.data || [];
+        if (result.success && result.data) {
+            window.notificationsData = result.data;
+            renderNotifications();
             updateNotificationBadge();
         } else {
-            notificationsData = [];
+            window.notificationsData = [];
+            renderNotifications();
         }
     } catch (error) {
         console.error('Failed to load notifications:', error);
-        notificationsData = [];
+        window.notificationsData = [];
+        renderNotifications();
     }
 }
 
+function renderNotifications() {
+    const notificationsCount = document.getElementById('notificationsCount');
+    const notificationsSlider = document.getElementById('notificationsSlider');
+    const notificationPreviews = document.getElementById('notificationPreviews');
+    const noNotifications = document.getElementById('noNotifications');
+    
+    if (notificationsCount) notificationsCount.textContent = `(${window.notificationsData.length})`;
+    
+    // Reset indices
+    currentNotificationIndex = 0;
+    
+    // Reset search input
+    const searchInput = document.getElementById('searchNotifications');
+    if (searchInput) searchInput.value = '';
+    
+    if (!window.notificationsData || window.notificationsData.length === 0) {
+        if (notificationsSlider) notificationsSlider.style.display = 'none';
+        if (notificationPreviews) notificationPreviews.style.display = 'none';
+        if (noNotifications) noNotifications.style.display = 'block';
+        return;
+    }
+    
+    if (currentUser) {
+        // ĐÃ LOGIN: Show full slider
+        if (notificationsSlider) notificationsSlider.style.display = 'block';
+        if (notificationPreviews) notificationPreviews.style.display = 'none';
+        if (noNotifications) noNotifications.style.display = 'none';
+        renderNotificationSlider();
+    } else {
+        // CHƯA LOGIN: Show locked previews
+        if (notificationsSlider) notificationsSlider.style.display = 'none';
+        if (notificationPreviews) notificationPreviews.style.display = 'block';
+        if (noNotifications) noNotifications.style.display = 'none';
+        renderNotificationPreviews();
+    }
+}
+
+function renderNotificationSlider() {
+    const slidesContainer = document.getElementById('notificationSlides');
+    const counter = document.getElementById('notificationCounter');
+    const dotsContainer = document.getElementById('notificationDots');
+    const prevBtn = document.getElementById('prevNotification');
+    const nextBtn = document.getElementById('nextNotification');
+    
+    if (!slidesContainer) return;
+    
+    if (isShowingAllNotifications) {
+        // SHOW ALL NOTIFICATIONS
+        slidesContainer.innerHTML = window.notificationsData.map(notification => `
+            <div class="notification-slide">
+                <h3><i class="fas fa-bell"></i> ${notification.title || 'Thông báo'}</h3>
+                <div class="notification-content">
+                    ${notification.content}
+                </div>
+                <div class="notification-meta">
+                    <div class="notification-author">
+                        <i class="fas fa-user"></i>
+                        <span>${notification.author?.username || 'System'}</span>
+                    </div>
+                    <div class="notification-date">
+                        <i class="far fa-calendar"></i>
+                        <span>${new Date(notification.createdAt).toLocaleDateString()}</span>
+                    </div>
+                </div>
+                
+                <!-- Hiển thị replies nếu có -->
+                ${notification.replies && notification.replies.length > 0 ? `
+                    <div style="margin-top: 20px; padding-left: 20px; border-left: 2px solid rgba(33, 150, 243, 0.3);">
+                        <h4 style="color: #2196F3; font-size: 1rem; margin-bottom: 10px;">
+                            <i class="fas fa-reply"></i> Phản hồi (${notification.replies.length})
+                        </h4>
+                        ${notification.replies.map(reply => `
+                            <div style="background: rgba(33, 150, 243, 0.05); padding: 10px; 
+                                        border-radius: 8px; margin-bottom: 8px;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                                    <small style="color: #888;">
+                                        <i class="fas fa-user"></i> ${reply.author?.username || 'System'}
+                                    </small>
+                                    <small style="color: #888;">
+                                        ${new Date(reply.createdAt).toLocaleDateString()}
+                                    </small>
+                                </div>
+                                <div>${reply.content}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : ''}
+            </div>
+        `).join('');
+        
+        if (counter) counter.textContent = `Tất cả thông báo (${window.notificationsData.length})`;
+        if (dotsContainer) dotsContainer.innerHTML = '';
+        
+        if (prevBtn) prevBtn.disabled = true;
+        if (nextBtn) nextBtn.disabled = true;
+        
+    } else {
+        // SHOW SINGLE NOTIFICATION
+        if (window.notificationsData.length === 0) return;
+        
+        const notification = window.notificationsData[currentNotificationIndex];
+        slidesContainer.innerHTML = `
+            <div class="notification-slide">
+                <h3><i class="fas fa-bell"></i> ${notification.title || 'Thông báo'}</h3>
+                <div class="notification-content">
+                    ${notification.content}
+                </div>
+                <div class="notification-meta">
+                    <div class="notification-author">
+                        <i class="fas fa-user"></i>
+                        <span>${notification.author?.username || 'System'}</span>
+                    </div>
+                    <div class="notification-date">
+                        <i class="far fa-calendar"></i>
+                        <span>${new Date(notification.createdAt).toLocaleDateString()}</span>
+                    </div>
+                </div>
+                
+                <!-- Hiển thị replies nếu có -->
+                ${notification.replies && notification.replies.length > 0 ? `
+                    <div style="margin-top: 20px; padding-left: 20px; border-left: 2px solid rgba(33, 150, 243, 0.3);">
+                        <h4 style="color: #2196F3; font-size: 1rem; margin-bottom: 10px;">
+                            <i class="fas fa-reply"></i> Phản hồi (${notification.replies.length})
+                        </h4>
+                        ${notification.replies.map(reply => `
+                            <div style="background: rgba(33, 150, 243, 0.05); padding: 10px; 
+                                        border-radius: 8px; margin-bottom: 8px;">
+                                <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                                    <small style="color: #888;">
+                                        <i class="fas fa-user"></i> ${reply.author?.username || 'System'}
+                                    </small>
+                                    <small style="color: #888;">
+                                        ${new Date(reply.createdAt).toLocaleDateString()}
+                                    </small>
+                                </div>
+                                <div>${reply.content}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                ` : ''}
+            </div>
+        `;
+        
+        if (counter) counter.textContent = `${currentNotificationIndex + 1} / ${window.notificationsData.length}`;
+        
+        // Create dots
+        if (dotsContainer && window.notificationsData.length > 1) {
+            dotsContainer.innerHTML = window.notificationsData.map((_, index) => 
+                `<span class="slider-dot ${index === currentNotificationIndex ? 'active' : ''}" onclick="goToNotificationSlide(${index})"></span>`
+            ).join('');
+        }
+        
+        // Enable/disable buttons
+        if (prevBtn) prevBtn.disabled = window.notificationsData.length <= 1;
+        if (nextBtn) nextBtn.disabled = window.notificationsData.length <= 1;
+    }
+}
+
+function renderNotificationPreviews() {
+    const previewsContainer = document.getElementById('notificationPreviews');
+    if (!previewsContainer) return;
+    
+    if (!window.notificationsData || window.notificationsData.length === 0) {
+        previewsContainer.innerHTML = `<div class="no-updates"><p>Chưa có thông báo nào</p></div>`;
+        return;
+    }
+    
+    // Hiển thị preview của notification đầu tiên
+    const notification = window.notificationsData[0];
+    const isReply = notification.parentNotificationId;
+    
+    previewsContainer.innerHTML = `
+        <div class="notification-preview ${isReply ? 'notification-reply-preview' : ''}">
+            <h4><i class="fas fa-bell"></i> ${notification.title || 'Thông báo'}</h4>
+            
+            <div class="notification-login-prompt">
+                <i class="fas fa-lock"></i> 
+                <p style="margin: 10px 0;">Đăng nhập để xem thông báo đầy đủ</p>
+                <a onclick="showAuthModal('login')" 
+                   style="color: #2196F3; cursor: pointer; text-decoration: underline; font-size: 0.9rem;">
+                   Nhấn để đăng nhập
+                </a>
+            </div>
+            
+            <div style="color: #666; font-size: 0.9rem;">
+                <small><i class="far fa-calendar"></i> ${new Date(notification.createdAt).toLocaleDateString()}</small>
+            </div>
+        </div>
+        
+        ${window.notificationsData.length > 1 ? `
+            <div class="preview-navigation">
+                <span class="preview-counter">+${window.notificationsData.length - 1} thông báo khác</span>
+                <button class="preview-nav-btn" onclick="showAuthModal('login')">
+                    Đăng nhập để xem <i class="fas fa-arrow-right"></i>
+                </button>
+            </div>
+        ` : ''}
+    `;
+}
+
+function filterNotifications() {
+    const searchTerm = document.getElementById('searchNotifications')?.value.toLowerCase() || '';
+    
+    const filtered = window.notificationsData.filter(notification => 
+        (notification.title && notification.title.toLowerCase().includes(searchTerm)) || 
+        (notification.content && notification.content.toLowerCase().includes(searchTerm))
+    );
+    
+    // Reset index khi search
+    currentNotificationIndex = 0;
+    
+    if (currentUser) {
+        if (filtered.length === 0) {
+            document.getElementById('notificationSlides').innerHTML = `
+                <div style="text-align: center; padding: 40px;">
+                    <i class="fas fa-search"></i>
+                    <h4>Không tìm thấy thông báo</h4>
+                </div>
+            `;
+        } else {
+            renderNotificationSlider();
+        }
+    } else {
+        if (filtered.length === 0) {
+            document.getElementById('notificationPreviews').innerHTML = `
+                <div class="no-search-results">
+                    <i class="fas fa-search"></i>
+                    <h4>Không tìm thấy thông báo</h4>
+                </div>
+            `;
+        } else {
+            renderNotificationPreviews();
+        }
+    }
+    
+    document.getElementById('notificationsCount').textContent = `(${filtered.length})`;
+}
+
+function prevNotification() {
+    if (isShowingAllNotifications || window.notificationsData.length <= 1) return;
+    currentNotificationIndex = (currentNotificationIndex - 1 + window.notificationsData.length) % window.notificationsData.length;
+    renderNotificationSlider();
+}
+
+function nextNotification() {
+    if (isShowingAllNotifications || window.notificationsData.length <= 1) return;
+    currentNotificationIndex = (currentNotificationIndex + 1) % window.notificationsData.length;
+    renderNotificationSlider();
+}
+
+function toggleShowAllNotifications() {
+    isShowingAllNotifications = !isShowingAllNotifications;
+    currentNotificationIndex = 0;
+    
+    const showAllBtn = document.getElementById('showAllNotifications');
+    if (showAllBtn) {
+        showAllBtn.innerHTML = isShowingAllNotifications ? 
+            '<i class="fas fa-times"></i> Hiển thị từng cái' : 
+            '<i class="fas fa-list"></i> Hiển thị tất cả';
+    }
+    
+    renderNotificationSlider();
+}
+
+function goToNotificationSlide(index) {
+    if (isShowingAllNotifications || index < 0 || index >= window.notificationsData.length) return;
+    currentNotificationIndex = index;
+    renderNotificationSlider();
+}
+
 function updateNotificationBadge() {
-    if (!notificationsData || !notificationsData.length) return;
+    if (!window.notificationsData || !window.notificationsData.length) return;
     
-    // Tính số thông báo chưa đọc
-    const unreadCount = notificationsData.filter(n => !n.read).length;
+    // Tính số thông báo chưa đọc (nếu có field read)
+    const unreadCount = window.notificationsData.filter(n => !n.read).length;
     
-    // Tạo hoặc cập nhật badge
-    let badge = document.getElementById('notificationBadge');
-    
+    // Tạo badge trên header nếu có thông báo mới
     if (unreadCount > 0) {
+        let badge = document.getElementById('notificationHeaderBadge');
         if (!badge) {
             badge = document.createElement('span');
-            badge.id = 'notificationBadge';
-            badge.className = 'notification-badge';
+            badge.id = 'notificationHeaderBadge';
+            badge.className = 'unread-badge';
             badge.style.cssText = `
                 background: #ff4757;
                 color: white;
@@ -1764,18 +2030,16 @@ function updateNotificationBadge() {
                 justify-content: center;
                 font-size: 0.8rem;
                 font-weight: bold;
-                margin-left: 5px;
+                margin-left: 10px;
             `;
             
-            // Thêm vào username nếu có
-            const usernameDisplay = document.getElementById('usernameDisplay');
-            if (usernameDisplay) {
-                usernameDisplay.appendChild(badge);
+            // Thêm vào notifications header
+            const notificationsHeader = document.querySelector('#notificationsSection h2');
+            if (notificationsHeader) {
+                notificationsHeader.appendChild(badge);
             }
         }
         badge.textContent = unreadCount;
-    } else if (badge) {
-        badge.remove();
     }
 }
 
@@ -1807,3 +2071,8 @@ async function initializePage() {
     
     console.log('✅ Page initialized');
 }
+window.prevNotification = prevNotification;
+window.nextNotification = nextNotification;
+window.toggleShowAllNotifications = toggleShowAllNotifications;
+window.goToNotificationSlide = goToNotificationSlide;
+window.filterNotifications = filterNotifications;

@@ -96,36 +96,24 @@ function closeUpdateForm() {
 }
 
 // ===== NOTIFICATION FORM MODAL =====
-function showNotificationForm() {
+function showNotificationForm(parentNotificationId = null) {
     const modal = document.createElement('div');
     modal.className = 'custom-modal-overlay';
     modal.id = 'notificationFormModal';
     
+    const isReply = parentNotificationId !== null;
+    
     modal.innerHTML = `
         <div class="custom-modal">
             <div class="modal-header">
-                <h2><i class="fas fa-bell"></i> Add Notification</h2>
+                <h2><i class="fas fa-bell"></i> ${isReply ? 'Add Reply' : 'Add Notification'}</h2>
                 <button class="modal-close-btn" onclick="closeCustomModal('notificationFormModal')">
                     <i class="fas fa-times"></i>
                 </button>
             </div>
             
             <div class="modal-body">
-                <div class="form-group">
-                    <label for="notificationName">
-                        <i class="fas fa-tag"></i> Notification Name
-                    </label>
-                    <input type="text" 
-                           id="notificationName" 
-                           class="form-input" 
-                           placeholder="Enter notification name..."
-                           value="Thông báo cơ bản"
-                           maxlength="50">
-                    <div class="char-count">
-                        <span id="notificationNameCharCount">15</span>/50 characters
-                    </div>
-                </div>
-                
+                ${!isReply ? `
                 <div class="form-group">
                     <label for="notificationTitle">
                         <i class="fas fa-heading"></i> Title
@@ -139,27 +127,33 @@ function showNotificationForm() {
                         <span id="notificationTitleCharCount">0</span>/100 characters
                     </div>
                 </div>
+                ` : ''}
                 
                 <div class="form-group">
                     <label for="notificationContent">
-                        <i class="fas fa-align-left"></i> Content
+                        <i class="fas fa-align-left"></i> ${isReply ? 'Reply Content' : 'Content'}
                     </label>
                     <textarea id="notificationContent" 
                               class="form-textarea" 
-                              placeholder="Enter notification content..."
-                              rows="4"></textarea>
+                              placeholder="${isReply ? 'Enter reply content...' : 'Enter notification content...'}"
+                              rows="${isReply ? '4' : '6'}"></textarea>
                     <div class="char-count">
-                        <span id="notificationContentCharCount">0</span>/500 characters
+                        <span id="notificationContentCharCount">0</span>/${isReply ? '500' : '1000'} characters
                     </div>
                 </div>
+                
+                ${parentNotificationId ? 
+                    `<input type="hidden" id="parentNotificationId" value="${parentNotificationId}">` : 
+                    ''
+                }
             </div>
             
             <div class="modal-footer">
                 <button class="cancel-btn" onclick="closeCustomModal('notificationFormModal')">
                     <i class="fas fa-times"></i> Cancel
                 </button>
-                <button class="submit-btn" onclick="submitNotification()">
-                    <i class="fas fa-check"></i> Send Notification
+                <button class="submit-btn" onclick="submitNotification(${parentNotificationId ? "'" + parentNotificationId + "'" : 'null'})">
+                    <i class="fas fa-check"></i> ${isReply ? 'Send Reply' : 'Send Notification'}
                 </button>
             </div>
         </div>
@@ -168,35 +162,39 @@ function showNotificationForm() {
     document.body.appendChild(modal);
     
     // Character counters
-    const nameInput = document.getElementById('notificationName');
-    const titleInput = document.getElementById('notificationTitle');
+    if (!isReply) {
+        const titleInput = document.getElementById('notificationTitle');
+        const titleCounter = document.getElementById('notificationTitleCharCount');
+        
+        titleInput.addEventListener('input', () => {
+            titleCounter.textContent = titleInput.value.length;
+        });
+        
+        setTimeout(() => titleInput.focus(), 100);
+    } else {
+        const contentInput = document.getElementById('notificationContent');
+        setTimeout(() => contentInput.focus(), 100);
+    }
+    
     const contentInput = document.getElementById('notificationContent');
-    const nameCounter = document.getElementById('notificationNameCharCount');
-    const titleCounter = document.getElementById('notificationTitleCharCount');
     const contentCounter = document.getElementById('notificationContentCharCount');
-    
-    nameInput.addEventListener('input', () => {
-        nameCounter.textContent = nameInput.value.length;
-    });
-    
-    titleInput.addEventListener('input', () => {
-        titleCounter.textContent = titleInput.value.length;
-    });
     
     contentInput.addEventListener('input', () => {
         contentCounter.textContent = contentInput.value.length;
     });
-    
-    setTimeout(() => nameInput.focus(), 100);
 }
 
-async function submitNotification() {
-    const name = document.getElementById('notificationName').value.trim();
-    const title = document.getElementById('notificationTitle').value.trim();
+async function submitNotification(parentNotificationId = null) {
+    const title = parentNotificationId ? null : document.getElementById('notificationTitle').value.trim();
     const content = document.getElementById('notificationContent').value.trim();
     
-    if (!name || !title || !content) {
-        showNotification('Please fill in all fields', 'error');
+    if (!content) {
+        showNotification('Please enter content', 'error');
+        return;
+    }
+    
+    if (!parentNotificationId && !title) {
+        showNotification('Please enter title', 'error');
         return;
     }
     
@@ -206,18 +204,31 @@ async function submitNotification() {
     }
     
     try {
-        const result = await window.userSystem.createNotification(title, content, name);
+        const result = await window.userSystem.createNotification(title, content, parentNotificationId);
         if (result.success) {
             closeCustomModal('notificationFormModal');
+            
+            // Refresh notifications in admin panel
             if (typeof loadNotificationsList === 'function') {
                 await loadNotificationsList();
             }
-            showNotification('Notification sent!', 'success');
+            
+            // Refresh updates section trên trang chính
+            if (typeof loadUpdates === 'function') {
+                await loadUpdates();
+            }
+            
+            // Refresh admin stats
+            if (typeof updateAdminStats === 'function') {
+                await updateAdminStats();
+            }
+            
+            showNotification(parentNotificationId ? 'Reply sent!' : 'Notification sent!', 'success');
         } else {
-            showNotification(result.error || 'Failed to send notification', 'error');
+            showNotification(result.error || 'Failed to send', 'error');
         }
     } catch (error) {
-        showNotification('Failed to send notification', 'error');
+        showNotification('Failed to send', 'error');
     }
 }
 

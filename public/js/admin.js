@@ -86,6 +86,11 @@ async function loadUsersList() {
         if (result.success) {
             const users = result.data || [];
             
+            if (users.length === 0) {
+                usersList.innerHTML = '<div style="color: #aaa; text-align: center; padding: 30px;">No users found</div>';
+                return;
+            }
+            
             usersList.innerHTML = users.map((user, index) => {
                 const isCurrentUser = currentUser && user._id === currentUser._id;
                 
@@ -97,7 +102,7 @@ async function loadUsersList() {
                             </strong>
                             <div class="user-details">
                                 <small><i class="fas fa-envelope"></i> ${user.email || 'No email'}</small>
-                                <small><i class="far fa-calendar"></i> ${new Date(user.createdAt).toLocaleDateString()}</small>
+                                <small><i class="far fa-calendar"></i> ${user.createdAt ? new Date(user.createdAt).toLocaleDateString() : 'Unknown date'}</small>
                                 ${user.isBanned ? 
                                     '<small style="color:#ff4757"><i class="fas fa-ban"></i> BANNED</small>' : 
                                     '<small><i class="far fa-check-circle"></i> Active</small>'
@@ -126,11 +131,12 @@ async function loadUsersList() {
                 `;
             }).join('');
         } else {
-            usersList.innerHTML = '<div class="error">Failed to load users</div>';
+            usersList.innerHTML = '<div class="error" style="color: #ff4757; text-align: center; padding: 20px;">' + 
+                                 (result.error || 'Failed to load users') + '</div>';
         }
     } catch (error) {
         console.error('Failed to load users:', error);
-        usersList.innerHTML = '<div class="error">Failed to load users</div>';
+        usersList.innerHTML = '<div class="error" style="color: #ff4757; text-align: center; padding: 20px;">Error loading users: ' + error.message + '</div>';
     }
 }
 
@@ -141,21 +147,49 @@ async function banUser(userId, username) {
         return;
     }
     
+    console.log('🔍 Banning user:', userId);
+    console.log('🔐 Current token:', window.userSystem.token ? 'Present' : 'Missing');
+    console.log('👤 Current user:', window.userSystem.currentUser);
+    
     showCustomConfirm(
         'Ban User',
         `Are you sure you want to ban user <strong>${username}</strong>?`,
         async () => {
             try {
+                // Kiểm tra token trước khi gọi API
+                if (!window.userSystem.token) {
+                    showNotification('Please login again', 'error');
+                    window.userSystem.clearToken();
+                    window.location.reload();
+                    return;
+                }
+                
+                console.log('📡 Calling ban API...');
                 const result = await window.userSystem.banUser(userId);
+                console.log('📡 Ban result:', result);
+                
                 if (result.success) {
                     showNotification(result.message || 'User banned', 'success');
                     await loadUsersList();
                     await updateAdminStats();
                 } else {
                     showNotification(result.error || 'Failed to ban user', 'error');
+                    
+                    // Nếu lỗi 401, clear token
+                    if (result.error && result.error.includes('401')) {
+                        window.userSystem.clearToken();
+                        updateAuthUI();
+                    }
                 }
             } catch (error) {
-                showNotification('Failed to ban user', 'error');
+                console.error('Ban user error:', error);
+                showNotification('Failed to ban user: ' + error.message, 'error');
+                
+                // Nếu lỗi token, clear và reload
+                if (error.message.includes('401') || error.message.includes('Unauthorized')) {
+                    window.userSystem.clearToken();
+                    setTimeout(() => window.location.reload(), 1000);
+                }
             }
         }
     );
@@ -276,20 +310,27 @@ async function deleteCommentAdmin(commentId) {
         'Are you sure you want to delete this comment?',
         async () => {
             try {
-                const result = await window.userSystem.deleteComment(commentId);
+                // DÙNG ADMIN ENDPOINT: /api/admin/comments/:id
+                const result = await window.userSystem.deleteCommentAdmin(commentId);
+                
                 if (result.success) {
                     showNotification('Comment deleted', 'success');
                     await loadAdminCommentsList();
                     await updateAdminStats();
+                    
                     // Reload main comments
                     if (window.loadComments) {
                         await window.loadComments();
                     }
                 } else {
                     showNotification(result.error || 'Failed to delete comment', 'error');
+                    
+                    // Debug thêm
+                    console.error('Admin delete comment failed:', result);
                 }
             } catch (error) {
-                showNotification('Failed to delete comment', 'error');
+                console.error('Delete comment error:', error);
+                showNotification('Failed to delete comment: ' + error.message, 'error');
             }
         }
     );
@@ -317,7 +358,7 @@ function openAdminTab(tabName) {
         loadUsersList();
     } else if (tabName === 'comments') {
         loadAdminCommentsList();
-    } else if (tabName === 'notifications') { // THÊM DÒNG NÀY
+    } else if (tabName === 'notifications') {
         loadNotificationsList();
     }
 }
@@ -365,33 +406,87 @@ async function loadNotificationsList() {
         if (result.success) {
             const notifications = result.data || [];
             
+            if (notifications.length === 0) {
+                notificationsList.innerHTML = '<div style="color: #aaa; text-align: center; padding: 30px;">No notifications yet</div>';
+                return;
+            }
+            
             notificationsList.innerHTML = notifications.map(notification => {
                 return `
                     <div class="notification-item" data-notification-id="${notification._id}">
-                        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 10px;">
+                        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 15px;">
                             <div>
-                                <strong>${notification.author?.username || 'System'}</strong>
+                                <strong>${notification.title || 'No Title'}</strong>
                                 <small style="color: #888; margin-left: 10px;">
-                                    ${new Date(notification.createdAt).toLocaleString()}
+                                    ${notification.createdAt ? new Date(notification.createdAt).toLocaleString() : 'Unknown date'}
                                 </small>
                             </div>
+                            <div>
+                                <button class="reply-btn" onclick="showNotificationReplyForm('${notification._id}')" 
+                                        style="background: rgba(33,150,243,0.1); border: 1px solid rgba(33,150,243,0.3); 
+                                               color: #2196F3; padding: 5px 10px; border-radius: 5px; 
+                                               font-size: 0.8rem; margin-right: 10px;">
+                                    <i class="fas fa-reply"></i> Reply
+                                </button>
+                            </div>
                         </div>
-                        <div style="background: rgba(255,255,255,0.05); padding: 10px; border-radius: 5px; margin-bottom: 10px;">
-                            ${notification.content}
+                        <div style="background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                            ${notification.content || ''}
                         </div>
-                        <button class="admin-delete-notification-btn" onclick="deleteNotificationAdmin('${notification._id}')">
-                            <i class="fas fa-trash"></i> Delete Notification
-                        </button>
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <small style="color: #aaa;">
+                                <i class="fas fa-user"></i> 
+                                ${notification.author?.username || 'System'}
+                            </small>
+                            <button class="admin-delete-notification-btn" onclick="deleteNotificationAdmin('${notification._id}')">
+                                <i class="fas fa-trash"></i> Delete
+                            </button>
+                        </div>
+                        
+                        <!-- Replies -->
+                        ${notification.replies && notification.replies.length > 0 ? `
+                            <div style="margin-top: 15px; padding-left: 20px; border-left: 2px solid rgba(255, 193, 7, 0.3);">
+                                <h5 style="color: #aaa; margin-bottom: 10px; font-size: 0.9rem;">
+                                    <i class="fas fa-reply"></i> Replies (${notification.replies.length})
+                                </h5>
+                                ${notification.replies.map(reply => `
+                                    <div style="background: rgba(255, 255, 255, 0.03); padding: 10px; 
+                                                border-radius: 6px; margin-bottom: 8px;">
+                                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                                            <small style="color: #888;">
+                                                <i class="fas fa-user"></i> ${reply.author?.username || 'System'}
+                                            </small>
+                                            <small style="color: #888;">
+                                                ${reply.createdAt ? new Date(reply.createdAt).toLocaleString() : ''}
+                                            </small>
+                                        </div>
+                                        <div>${reply.content || ''}</div>
+                                        <div style="text-align: right; margin-top: 5px;">
+                                            <button class="delete-reply-btn" onclick="deleteNotificationAdmin('${reply._id}')"
+                                                    style="background: rgba(255, 71, 87, 0.1); border: 1px solid rgba(255, 71, 87, 0.3); 
+                                                           color: #ff4757; padding: 3px 8px; border-radius: 4px; 
+                                                           font-size: 0.75rem;">
+                                                <i class="fas fa-trash"></i> Delete
+                                            </button>
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        ` : ''}
                     </div>
                 `;
             }).join('');
         } else {
-            notificationsList.innerHTML = '<div class="error">Failed to load notifications</div>';
+            notificationsList.innerHTML = '<div class="error">' + (result.error || 'Failed to load notifications') + '</div>';
         }
     } catch (error) {
         console.error('Failed to load notifications:', error);
         notificationsList.innerHTML = '<div class="error">Failed to load notifications</div>';
     }
+}
+
+function showNotificationReplyForm(parentNotificationId) {
+    window.showNotificationForm(parentNotificationId);
 }
 
 async function loadNotifications() {
@@ -498,7 +593,6 @@ async function deleteNotificationAdmin(notificationId) {
     );
 }
 
-
 // ============ GLOBAL EXPORTS ============
 // Make functions available globally
 window.toggleAdminPanel = toggleAdminPanel;
@@ -514,3 +608,4 @@ window.editUpdate = editUpdate;
 window.deleteUpdateAdmin = deleteUpdateAdmin;
 window.loadNotificationsList = loadNotificationsList;
 window.deleteNotificationAdmin = deleteNotificationAdmin;
+window.showNotificationReplyForm = showNotificationReplyForm;
