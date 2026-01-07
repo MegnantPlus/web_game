@@ -425,211 +425,46 @@ async logout() {
         }
     }
 
-    // ============ NOTIFICATIONS API ============
+// ============ NOTIFICATIONS API ============
+async createNotification(title, content, name = "Thông báo cơ bản") {
+    try {
+        const result = await this.apiCall('/notifications', 'POST', {
+            name: name,
+            body: {
+                title: title,
+                content: content
+            }
+        });
+        return result;
+    } catch (error) {
+        return { 
+            success: false, 
+            error: error.message 
+        };
+    }
+}
+
 async getNotifications() {
     try {
         const result = await this.apiCall('/notifications', 'GET');
-        return result;
-    } catch (error) {
-        console.error('Failed to load notifications:', error);
-        return { 
-            success: false, 
-            error: error.message,
-            data: []
-        };
-    }
-}
-
-    async createNotification(content, parentNotificationId = null) {
-    try {
-        const data = { content };
-        if (parentNotificationId) {
-            data.parentNotificationId = parentNotificationId;
-        }
         
-        const result = await this.apiCall('/notifications', 'POST', data);
-        return result;
-    } catch (error) {
-        return { 
-            success: false, 
-            error: error.message 
-        };
-    }
-}
-
-    async deleteNotification(notificationId) {
-    try {
-        const result = await this.apiCall(`/notifications/${notificationId}`, 'DELETE');
-        return result;
-    } catch (error) {
-        return { 
-            success: false, 
-            error: error.message 
-        };
-    }
-}
-
-// ============ COMMENT DETAILS ============
-async getCommentById(commentId) {
-    try {
-        const result = await this.apiCall(`/comments/${commentId}`, 'GET');
-        return result;
-    } catch (error) {
-        return { 
-            success: false, 
-            error: error.message 
-        };
-    }
-}
-
-
-async updateComment(commentId, content) {
-    try {
-        const result = await this.apiCall(`/comments/${commentId}`, 'PUT', { 
-            content 
-        });
-        return result;
-    } catch (error) {
-        return { 
-            success: false, 
-            error: error.message 
-        };
-    }
-}
-
-// ============ NOTIFICATION METHODS BỔ SUNG ============
-async getNotificationById(notificationId) {
-    try {
-        const result = await this.apiCall(`/notifications/${notificationId}`, 'GET');
-        return result;
-    } catch (error) {
-        return { 
-            success: false, 
-            error: error.message 
-        };
-    }
-}
-
-
-async updateNotification(notificationId, content) {
-    try {
-        const result = await this.apiCall(`/notifications/${notificationId}`, 'PUT', { 
-            content 
-        });
-        return result;
-    } catch (error) {
-        return { 
-            success: false, 
-            error: error.message 
-        };
-    }
-}
-
-// ============ ADMIN COMMENT DELETE ============
-async adminDeleteComment(commentId) {
-    try {
-        const result = await this.apiCall(`/admin/comments/${commentId}`, 'DELETE');
-        return result;
-    } catch (error) {
-        return { 
-            success: false, 
-            error: error.message 
-        };
-    }
-}
-
-    // ============ ADMIN METHODS ============
-    async getUsers() {
-        try {
-            const result = await this.apiCall('/admin/users', 'GET');
+        // Chuyển đổi dữ liệu từ API mới sang format cũ
+        if (result.success && result.data) {
+            const formattedData = result.data.map(item => ({
+                _id: item._id,
+                title: item.body?.title || 'No Title',
+                content: item.body?.content || '',
+                author: item.author || { username: 'System' },
+                createdAt: item.createdAt,
+                name: item.name
+            }));
             
-            if (!result) {
-                return {
-                    success: false,
-                    error: 'No response from server'
-                };
-            }
-            
-            return result;
-        } catch (error) {
-            return { 
-                success: false, 
-                error: error.message 
-            };
-        }
-    }
-
-    async getStats() {
-        try {
-            const result = await this.apiCall('/admin/stats', 'GET');
-            
-            if (!result) {
-                return {
-                    success: false,
-                    error: 'No response from server'
-                };
-            }
-            
-            return result;
-        } catch (error) {
-            return { 
-                success: false, 
-                error: error.message 
-            };
-        }
-    }
-
-async banUser(userId) {
-    try {
-        // SỬA: PATCH thay vì PUT (theo tài liệu API)
-        const result = await this.apiCall(`/admin/users/${userId}/ban`, 'PATCH');
-        
-        if (!result) {
             return {
-                success: false,
-                error: 'No response from server'
+                success: true,
+                data: formattedData
             };
         }
         
-        return result;
-    } catch (error) {
-        return { 
-            success: false, 
-            error: error.message 
-        };
-    }
-}
-
-
-    async deleteUser(userId) {
-        try {
-            const result = await this.apiCall(`/admin/users/${userId}`, 'DELETE');
-            
-            if (!result) {
-                return {
-                    success: false,
-                    error: 'No response from server'
-                };
-            }
-            
-            return result;
-        } catch (error) {
-            return { 
-                success: false, 
-                error: error.message 
-            };
-        }
-    }
-
-    canDeleteComment(commentAuthor) {
-        if (!this.currentUser) return false;
-        return this.currentUser.username === commentAuthor || this.isAdmin();
-    }
-
-    // ============ NOTIFICATIONS API ============
-async getNotifications() {
-    try {
-        const result = await this.apiCall('/notifications', 'GET');
         return result;
     } catch (error) {
         console.error('Failed to load notifications:', error);
@@ -641,26 +476,15 @@ async getNotifications() {
     }
 }
 
-async createNotification(content, parentNotificationId = null) {
+async updateNotification(notificationId, title, content, name = "Thông báo cơ bản") {
     try {
-        const data = { content };
-        if (parentNotificationId) {
-            data.parentNotificationId = parentNotificationId;
-        }
-        
-        const result = await this.apiCall('/notifications', 'POST', data);
-        return result;
-    } catch (error) {
-        return { 
-            success: false, 
-            error: error.message 
-        };
-    }
-}
-
-async deleteNotification(notificationId) {
-    try {
-        const result = await this.apiCall(`/notifications/${notificationId}`, 'DELETE');
+        const result = await this.apiCall(`/notifications/${notificationId}`, 'PUT', {
+            name: name,
+            body: {
+                title: title,
+                content: content
+            }
+        });
         return result;
     } catch (error) {
         return { 
@@ -673,6 +497,23 @@ async deleteNotification(notificationId) {
 async getNotificationById(notificationId) {
     try {
         const result = await this.apiCall(`/notifications/${notificationId}`, 'GET');
+        
+        // Format lại dữ liệu
+        if (result.success && result.data) {
+            const item = result.data;
+            return {
+                success: true,
+                data: {
+                    _id: item._id,
+                    title: item.body?.title || 'No Title',
+                    content: item.body?.content || '',
+                    author: item.author || { username: 'System' },
+                    createdAt: item.createdAt,
+                    name: item.name
+                }
+            };
+        }
+        
         return result;
     } catch (error) {
         return { 
@@ -696,7 +537,32 @@ async updateNotification(notificationId, content) {
     }
 }
 
+// ============ PAYMENT METHODS ============
+// Trong class UserSystem
+async createPayment(amount, description = "Ủng hộ website") {
+    try {
+        const result = await this.apiCall('/donations/create', 'POST', {
+            amount: parseInt(amount),
+            description: description
+        });
+        return result;
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
 }
+
+async checkPaymentStatus(orderCode) {
+    try {
+        const result = await this.apiCall(`/donations/${orderCode}`, 'GET');
+        return result;
+    } catch (error) {
+        return { success: false, error: error.message };
+    }
+}
+
+}
+
+
 
 // Create global instance
 window.userSystem = new UserSystem();

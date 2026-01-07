@@ -2662,3 +2662,215 @@ textarea#donateMessage {
     transform: translateY(-2px);
     box-shadow: 0 4px 15px rgba(255, 152, 0, 0.4);
 }
+/* ===== DONATE FORM STYLES ===== */
+.donate-modal-compact {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    border-radius: 15px;
+    width: 100%;
+    max-width: 400px;
+    border: 2px solid #ff4757;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    overflow: hidden;
+}
+
+/* Amount buttons - VND currency */
+.amount-buttons-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin: 15px 0;
+}
+
+.amount-btn {
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.amount-btn:hover {
+    background: rgba(33, 150, 243, 0.3);
+    border-color: #2196F3;
+}
+
+.amount-btn.active {
+    background: #2196F3;
+    border-color: #2196F3;
+    color: white;
+}
+
+/* Currency symbol */
+.currency-symbol {
+    font-size: 0.9em;
+    color: #4CAF50;
+    font-weight: bold;
+}
+
+/* QR Code container */
+.qr-container {
+    text-align: center;
+    padding: 20px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 10px;
+    margin-top: 20px;
+    display: none;
+}
+
+#qrCodeImage {
+    margin: 20px auto;
+    padding: 10px;
+    background: white;
+    border-radius: 5px;
+    display: inline-block;
+}
+
+.qr-info {
+    color: white;
+    font-size: 0.9rem;
+    margin-top: 15px;
+}
+
+.qr-info div {
+    margin: 5px 0;
+    display: flex;
+    justify-content: space-between;
+}
+
+.qr-info strong {
+    color: #4CAF50;
+}
+
+/* Polling status */
+.polling-status {
+    text-align: center;
+    padding: 10px;
+    margin: 15px 0;
+    border-radius: 8px;
+    font-size: 0.9rem;
+}
+
+.polling-status.pending {
+    background: rgba(255, 193, 7, 0.1);
+    border: 1px solid rgba(255, 193, 7, 0.3);
+    color: #FFC107;
+}
+
+.polling-status.success {
+    background: rgba(76, 175, 80, 0.1);
+    border: 1px solid rgba(76, 175, 80, 0.3);
+    color: #4CAF50;
+}
+
+.polling-status.error {
+    background: rgba(244, 67, 54, 0.1);
+    border: 1px solid rgba(244, 67, 54, 0.3);
+    color: #f44336;
+}
+
+/* Payment result */
+.payment-result {
+    text-align: center;
+    padding: 25px;
+    animation: fadeIn 0.5s ease;
+}
+
+.payment-success {
+    color: #4CAF50;
+    font-size: 1.5rem;
+    margin-bottom: 15px;
+}
+
+.payment-success i {
+    font-size: 3rem;
+    margin-bottom: 15px;
+}
+
+/* Loading for polling */
+.polling-loader {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: #2196F3;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+    margin-right: 10px;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Amount validation for VND */
+.amount-validation {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 5px;
+    font-size: 0.8rem;
+}
+
+.amount-min {
+    color: #ff9800;
+}
+
+.amount-max {
+    color: #2196F3;
+}
+
+.input-with-symbol {
+    position: relative;
+}
+
+.currency-input {
+    padding-left: 30px !important;
+}
+
+.input-symbol {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #4CAF50;
+    font-weight: bold;
+    z-index: 1;
+}
+
+/* Responsive QR code */
+@media (max-width: 400px) {
+    .amount-buttons-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .qr-container {
+        padding: 15px;
+    }
+    
+    #qrCodeImage {
+        width: 150px;
+        height: 150px;
+    }
+}
+@keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+@keyframes slideIn {
+    from { 
+        opacity: 0;
+        transform: translateX(30px);
+    }
+    to { 
+        opacity: 1;
+        transform: translateX(0);
+    }
+}

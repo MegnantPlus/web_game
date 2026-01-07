@@ -112,15 +112,44 @@ function showNotificationForm() {
             
             <div class="modal-body">
                 <div class="form-group">
+                    <label for="notificationName">
+                        <i class="fas fa-tag"></i> Notification Name
+                    </label>
+                    <input type="text" 
+                           id="notificationName" 
+                           class="form-input" 
+                           placeholder="Enter notification name..."
+                           value="Thông báo cơ bản"
+                           maxlength="50">
+                    <div class="char-count">
+                        <span id="notificationNameCharCount">15</span>/50 characters
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="notificationTitle">
+                        <i class="fas fa-heading"></i> Title
+                    </label>
+                    <input type="text" 
+                           id="notificationTitle" 
+                           class="form-input" 
+                           placeholder="Enter notification title..."
+                           maxlength="100">
+                    <div class="char-count">
+                        <span id="notificationTitleCharCount">0</span>/100 characters
+                    </div>
+                </div>
+                
+                <div class="form-group">
                     <label for="notificationContent">
-                        <i class="fas fa-align-left"></i> Notification Content
+                        <i class="fas fa-align-left"></i> Content
                     </label>
                     <textarea id="notificationContent" 
                               class="form-textarea" 
                               placeholder="Enter notification content..."
                               rows="4"></textarea>
                     <div class="char-count">
-                        <span id="notificationCharCount">0</span>/500 characters
+                        <span id="notificationContentCharCount">0</span>/500 characters
                     </div>
                 </div>
             </div>
@@ -138,22 +167,36 @@ function showNotificationForm() {
     
     document.body.appendChild(modal);
     
-    // Character counter
+    // Character counters
+    const nameInput = document.getElementById('notificationName');
+    const titleInput = document.getElementById('notificationTitle');
     const contentInput = document.getElementById('notificationContent');
-    const contentCounter = document.getElementById('notificationCharCount');
+    const nameCounter = document.getElementById('notificationNameCharCount');
+    const titleCounter = document.getElementById('notificationTitleCharCount');
+    const contentCounter = document.getElementById('notificationContentCharCount');
+    
+    nameInput.addEventListener('input', () => {
+        nameCounter.textContent = nameInput.value.length;
+    });
+    
+    titleInput.addEventListener('input', () => {
+        titleCounter.textContent = titleInput.value.length;
+    });
     
     contentInput.addEventListener('input', () => {
         contentCounter.textContent = contentInput.value.length;
     });
     
-    setTimeout(() => contentInput.focus(), 100);
+    setTimeout(() => nameInput.focus(), 100);
 }
 
 async function submitNotification() {
+    const name = document.getElementById('notificationName').value.trim();
+    const title = document.getElementById('notificationTitle').value.trim();
     const content = document.getElementById('notificationContent').value.trim();
     
-    if (!content) {
-        showNotification('Please enter notification content', 'error');
+    if (!name || !title || !content) {
+        showNotification('Please fill in all fields', 'error');
         return;
     }
     
@@ -163,7 +206,7 @@ async function submitNotification() {
     }
     
     try {
-        const result = await window.userSystem.createNotification(content);
+        const result = await window.userSystem.createNotification(title, content, name);
         if (result.success) {
             closeCustomModal('notificationFormModal');
             if (typeof loadNotificationsList === 'function') {
